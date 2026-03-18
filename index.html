@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ББХ · Постпродакшн</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f172a; font-family: system-ui, -apple-system, sans-serif; color: #e2e8f0; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+// ── КОНФИГ ───────────────────────────────────────────────────────
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ9eaHTzNR5YxffwciQBYnjhI04aGYTUhA5NzSttq3rrE1pBrImiIHB7vWpVR4l0h8Gpb5j1dnsHYf3/pub?output=csv";
+
+const PROJ_COLORS = {
+  "Северный Ветер": "#3b82f6",
+  "Большой Город": "#a855f7",
+  "Дикая Природа": "#22c55e",
+  "Звёздный Путь": "#f59e0b",
+  "Морской Берег": "#ec4899",
+  "Детектив":   "#f59e0b",
+  "Кухня":      "#ec4899",
+};
+
+const STATUSES = {
+  "синхра":    { label:"Синхра",    color:"#ec4899", bg:"rgba(236,72,153,0.12)"  },
+  "монтаж":    { label:"Монтаж",    color:"#6366f1", bg:"rgba(99,102,241,0.12)"  },
+  "цвет/звук": { label:"Цвет/Звук",color:"#f59e0b", bg:"rgba(245,158,11,0.12)"  },
+  "предотк":   { label:"Пред-ОТК", color:"#3b82f6", bg:"rgba(59,130,246,0.12)"  },
+  "отсмотр":   { label:"Отсмотр",  color:"#8b5cf6", bg:"rgba(139,92,246,0.12)"  },
+  "правки":    { label:"Правки",   color:"#f97316", bg:"rgba(249,115,22,0.12)"  },
+  "мастеринг": { label:"Мастеринг",color:"#14b8a6", bg:"rgba(20,184,166,0.12)"  },
+  "сдача":     { label:"Сдача ОТК",color:"#22c55e", bg:"rgba(34,197,94,0.12)"   },
+};
+const STATUS_ORDER = ["синхра","монтаж","цвет/звук","предотк","отсмотр","правки","мастеринг","сдача"];
+const WEEKDAYS_SHORT = ["вс","пн","вт","ср","чт","пт","сб"];
+
+// ── ДЕМО ─────────────────────────────────────────────────────────
+const DEMO_CSV = `проект,серия,статус,кто,день,с,до,заметка / факт
+Северный Ветер,С01,сдача,Захаров,16.03.2026,10,15,принято каналом
+Северный Ветер,С02,мастеринг,Громов,16.03.2026,10,18,финальная сборка
+Северный Ветер,С02,мастеринг,Ильин,16.03.2026,10,18,сведение звука
+Северный Ветер,С03,правки,Романов,16.03.2026,10,18,правки по монтажу
+Северный Ветер,С03,правки,Белов,16.03.2026,14,18,правки по звуку
+Северный Ветер,С04,монтаж,Крылова,16.03.2026,10,18,
+Северный Ветер,С04,синхра,Титов,16.03.2026,10,14,синхра завершена
+Северный Ветер,С05,синхра,Титов,16.03.2026,14,18,
+Северный Ветер,С02,сдача,Захаров,17.03.2026,10,13,финальная сдача
+Северный Ветер,С03,правки,Романов,17.03.2026,10,18,
+Северный Ветер,С04,монтаж,Крылова,17.03.2026,10,18,
+Северный Ветер,С05,синхра,Титов,17.03.2026,10,16,
+Северный Ветер,С03,отсмотр,Захаров,18.03.2026,11,14,отсмотр с заказчиком
+Северный Ветер,С04,монтаж,Крылова,18.03.2026,10,18,
+Северный Ветер,С04,монтаж,Белов,18.03.2026,10,18,параллельный монтаж
+Северный Ветер,С05,монтаж,Романов,18.03.2026,10,18,
+Северный Ветер,С04,монтаж,Крылова,19.03.2026,10,18,
+Северный Ветер,С04,монтаж,Белов,19.03.2026,10,18,
+Северный Ветер,С05,монтаж,Романов,19.03.2026,10,18,
+Северный Ветер,С03,правки,Романов,20.03.2026,10,14,финальные правки
+Северный Ветер,С04,цвет/звук,Громов,20.03.2026,10,18,цвет
+Северный Ветер,С04,цвет/звук,Ильин,20.03.2026,10,18,звук
+Северный Ветер,С05,монтаж,Романов,20.03.2026,10,18,
+Северный Ветер,С04,цвет/звук,Громов,21.03.2026,10,18,
+Северный Ветер,С05,монтаж,Крылова,21.03.2026,10,18,
+Северный Ветер,С04,предотк,Захаров,23.03.2026,10,13,
+Северный Ветер,С05,монтаж,Белов,23.03.2026,10,18,
+Северный Ветер,С05,монтаж,Крылова,23.03.2026,10,18,
+Северный Ветер,С04,отсмотр,Захаров,24.03.2026,12,15,
+Северный Ветер,С05,цвет/звук,Громов,24.03.2026,10,18,
+Северный Ветер,С05,цвет/звук,Ильин,24.03.2026,10,18,
+Большой Город,С01,сдача,Соколова,16.03.2026,10,14,сдан
+Большой Город,С02,отсмотр,Соколова,16.03.2026,15,18,замечания переданы
+Большой Город,С02,правки,Соколов,17.03.2026,10,18,
+Большой Город,С02,правки,Фёдоров,17.03.2026,10,15,
+Большой Город,С03,монтаж,Зайцева,17.03.2026,10,18,
+Большой Город,С03,синхра,Петров,17.03.2026,10,14,
+Большой Город,С02,правки,Соколов,18.03.2026,10,15,финальные правки
+Большой Город,С03,монтаж,Зайцева,18.03.2026,10,18,
+Большой Город,С03,монтаж,Фёдоров,18.03.2026,10,18,
+Большой Город,С02,мастеринг,Нилов,19.03.2026,10,18,цвет и мастер
+Большой Город,С02,мастеринг,Сидоров,19.03.2026,10,18,финальный звук
+Большой Город,С03,монтаж,Зайцева,19.03.2026,10,18,
+Большой Город,С03,монтаж,Фёдоров,19.03.2026,10,18,
+Большой Город,С02,сдача,Соколова,20.03.2026,10,13,
+Большой Город,С03,монтаж,Соколов,20.03.2026,10,18,
+Большой Город,С04,синхра,Петров,20.03.2026,10,18,
+Большой Город,С03,цвет/звук,Нилов,23.03.2026,10,18,
+Большой Город,С03,цвет/звук,Сидоров,23.03.2026,10,18,
+Большой Город,С04,монтаж,Фёдоров,23.03.2026,10,18,
+Большой Город,С04,монтаж,Зайцева,23.03.2026,10,18,
+Большой Город,С03,предотк,Соколова,24.03.2026,10,13,
+Большой Город,С04,монтаж,Соколов,24.03.2026,10,18,
+Большой Город,С04,монтаж,Фёдоров,24.03.2026,10,18,
+Дикая Природа,С01,монтаж,Орлов,16.03.2026,10,18,
+Дикая Природа,С01,монтаж,Волков,16.03.2026,10,18,
+Дикая Природа,С01,синхра,Захаров,16.03.2026,10,16,материал с экспедиции
+Дикая Природа,С01,монтаж,Орлов,17.03.2026,10,18,
+Дикая Природа,С01,монтаж,Волков,17.03.2026,10,18,
+Дикая Природа,С02,синхра,Захаров,17.03.2026,10,18,
+Дикая Природа,С01,монтаж,Смирнова,18.03.2026,10,18,
+Дикая Природа,С02,синхра,Захаров,18.03.2026,10,14,
+Дикая Природа,С01,монтаж,Орлов,19.03.2026,10,18,сложная сцена
+Дикая Природа,С01,монтаж,Смирнова,19.03.2026,10,18,
+Дикая Природа,С02,монтаж,Волков,19.03.2026,10,18,
+Дикая Природа,С01,цвет/звук,Нилов,20.03.2026,10,18,цвет природы
+Дикая Природа,С01,цвет/звук,Сидоров,20.03.2026,10,18,
+Дикая Природа,С02,монтаж,Волков,20.03.2026,10,18,
+Дикая Природа,С02,монтаж,Смирнова,20.03.2026,10,18,
+Дикая Природа,С01,цвет/звук,Нилов,21.03.2026,10,18,
+Дикая Природа,С02,монтаж,Орлов,21.03.2026,10,18,
+Дикая Природа,С01,предотк,Титов,23.03.2026,10,13,
+Дикая Природа,С02,монтаж,Волков,23.03.2026,10,18,
+Дикая Природа,С02,монтаж,Смирнова,23.03.2026,10,18,
+Дикая Природа,С01,отсмотр,Титов,24.03.2026,11,15,
+Дикая Природа,С02,цвет/звук,Нилов,24.03.2026,10,18,
+Дикая Природа,С02,цвет/звук,Сидоров,24.03.2026,10,18,
+Звёздный Путь,С01,цвет/звук,Громов,16.03.2026,10,18,
+Звёздный Путь,С01,цвет/звук,Ильин,16.03.2026,10,18,
+Звёздный Путь,С02,монтаж,Козлов,16.03.2026,10,18,
+Звёздный Путь,С02,монтаж,Морозов,16.03.2026,10,18,
+Звёздный Путь,С03,синхра,Петров,16.03.2026,10,18,
+Звёздный Путь,С01,предотк,Лебедева,17.03.2026,10,13,внутренний просмотр
+Звёздный Путь,С02,монтаж,Козлов,17.03.2026,10,18,
+Звёздный Путь,С02,монтаж,Лебедева,17.03.2026,10,18,
+Звёздный Путь,С03,монтаж,Морозов,17.03.2026,10,18,
+Звёздный Путь,С01,отсмотр,Лебедева,18.03.2026,14,17,
+Звёздный Путь,С02,монтаж,Козлов,18.03.2026,10,18,
+Звёздный Путь,С03,монтаж,Морозов,18.03.2026,10,18,
+Звёздный Путь,С03,монтаж,Лебедева,18.03.2026,10,18,
+Звёздный Путь,С01,правки,Козлов,19.03.2026,10,15,правки после отсмотра
+Звёздный Путь,С02,цвет/звук,Громов,19.03.2026,10,18,
+Звёздный Путь,С02,цвет/звук,Ильин,19.03.2026,10,18,
+Звёздный Путь,С03,монтаж,Морозов,19.03.2026,10,18,
+Звёздный Путь,С01,мастеринг,Громов,20.03.2026,10,18,
+Звёздный Путь,С02,предотк,Лебедева,20.03.2026,10,13,
+Звёздный Путь,С03,монтаж,Козлов,20.03.2026,10,18,
+Звёздный Путь,С01,сдача,Лебедева,21.03.2026,10,14,сдан продюсеру
+Звёздный Путь,С02,отсмотр,Лебедева,21.03.2026,15,18,
+Звёздный Путь,С03,цвет/звук,Громов,23.03.2026,10,18,
+Звёздный Путь,С03,цвет/звук,Ильин,23.03.2026,10,18,
+Звёздный Путь,С02,правки,Морозов,23.03.2026,10,18,
+Звёздный Путь,С03,предотк,Лебедева,24.03.2026,10,13,
+Звёздный Путь,С02,мастеринг,Громов,24.03.2026,10,18,
+Морской Берег,С01,предотк,Кириллов,16.03.2026,10,14,
+Морской Берег,С02,монтаж,Новиков,16.03.2026,10,18,
+Морской Берег,С02,монтаж,Попов,16.03.2026,10,18,
+Морской Берег,С03,синхра,Быков,16.03.2026,10,18,приехал материал
+Морской Берег,С01,отсмотр,Кириллов,17.03.2026,12,15,с продюсером
+Морской Берег,С02,монтаж,Кузнецова,17.03.2026,10,18,
+Морской Берег,С03,синхра,Быков,17.03.2026,10,15,
+Морской Берег,С03,монтаж,Новиков,17.03.2026,10,18,
+Морской Берег,С01,правки,Попов,18.03.2026,10,18,
+Морской Берег,С02,монтаж,Кузнецова,18.03.2026,10,18,
+Морской Берег,С03,монтаж,Новиков,18.03.2026,10,18,
+Морской Берег,С01,правки,Попов,19.03.2026,10,15,финальные правки
+Морской Берег,С02,цвет/звук,Дорохов,19.03.2026,10,18,
+Морской Берег,С02,цвет/звук,Степанов,19.03.2026,10,18,
+Морской Берег,С03,монтаж,Кузнецова,19.03.2026,10,18,
+Морской Берег,С03,монтаж,Попов,19.03.2026,10,18,
+Морской Берег,С01,мастеринг,Дорохов,20.03.2026,10,18,
+Морской Берег,С01,мастеринг,Степанов,20.03.2026,10,18,финальный звук
+Морской Берег,С03,монтаж,Новиков,20.03.2026,10,18,
+Морской Берег,С01,сдача,Кириллов,21.03.2026,10,13,
+Морской Берег,С02,предотк,Кириллов,21.03.2026,14,17,
+Морской Берег,С03,монтаж,Попов,21.03.2026,10,18,
+Морской Берег,С02,отсмотр,Кириллов,23.03.2026,11,14,
+Морской Берег,С03,цвет/звук,Дорохов,23.03.2026,10,18,
+Морской Берег,С03,цвет/звук,Степанов,23.03.2026,10,18,
+Морской Берег,С04,синхра,Быков,23.03.2026,10,18,новый блок
+Морской Берег,С02,правки,Новиков,24.03.2026,10,16,
+Морской Берег,С03,предотк,Кириллов,24.03.2026,10,13,
+Морской Берег,С04,монтаж,Кузнецова,24.03.2026,10,18,`;
+// ── УТИЛИТЫ ───────────────────────────────────────────────────────
+function ns(s) {
+  if (!s) return "";
+  const l = s.trim().toLowerCase();
+  if (l === "цвет / звук") return "цвет/звук";
+  return l;
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  const m = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1]);
+}
+
+function dayLabel(str) {
+  const d = parseDate(str);
+  if (!d) return str;
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  return `${WEEKDAYS_SHORT[d.getDay()]} ${dd}.${mm}`;
+}
+
+function weekKey(str) {
+  const d = parseDate(str);
+  if (!d) return str;
+  const day = d.getDay() || 7;
+  const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+  return mon.toISOString().slice(0,10);
+}
+
+function weekLabel(str) {
+  const d = parseDate(str);
+  if (!d) return str;
+  const day = d.getDay() || 7;
+  const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const fmt = dt => `${String(dt.getDate()).padStart(2,"0")}.${String(dt.getMonth()+1).padStart(2,"0")}`;
+  return `${fmt(mon)} – ${fmt(sun)}`;
+}
+
+function monthKey(str) {
+  const d = parseDate(str);
+  if (!d) return str;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+
+function monthLabel(str) {
+  const d = parseDate(str);
+  if (!d) return str;
+  const months = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+  return `${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
+  return lines.slice(1).map((line, idx) => {
+    const cols = []; let cur = "", inQ = false;
+    for (const ch of line) {
+      if (ch==='"') inQ=!inQ;
+      else if (ch===',' && !inQ) { cols.push(cur.trim()); cur=""; }
+      else cur+=ch;
+    }
+    cols.push(cur.trim());
+    const obj = { _id: idx };
+    headers.forEach((h,i) => { obj[h] = (cols[i]||"").replace(/^"|"$/g,"").trim(); });
+    obj["статус"] = ns(obj["статус"]);
+    obj._date = parseDate(obj["день"]);
+    obj._dayKey  = obj["день"];
+    obj._weekKey = weekKey(obj["день"]);
+    obj._monthKey = monthKey(obj["день"]);
+    return obj;
+  }).filter(r => r["проект"] && r["серия"] && r["кто"]);
+}
+
+function getConflicts(tasks) {
+  const ids = new Set();
+  const details = [];
+  const byPD = {};
+  tasks.forEach(t => {
+    const k = t["кто"] + "||" + t["день"];
+    if (!byPD[k]) byPD[k]=[];
+    byPD[k].push(t);
+  });
+  Object.values(byPD).forEach(group => {
+    for (let i=0;i<group.length;i++) for (let j=i+1;j<group.length;j++) {
+      const a=group[i], b=group[j];
+      const af=parseInt(a["с"])||0, at=parseInt(a["до"])||0;
+      const bf=parseInt(b["с"])||0, bt=parseInt(b["до"])||0;
+      if (af<bt && bf<at) {
+        ids.add(a._id); ids.add(b._id);
+        const key=[a._id,b._id].sort().join("-");
+        if (!details.find(d=>d.key===key))
+          details.push({ key, person:a["кто"], dayStr:a["день"], taskA:a, taskB:b,
+            overlapFrom:Math.max(af,bf), overlapTo:Math.min(at,bt) });
+      }
+    }
+  });
+  return { ids, details };
+}
+
+// ── КОМПОНЕНТЫ ────────────────────────────────────────────────────
+function StatusBadge({ s, small }) {
+  const st = STATUSES[s];
+  if (!st) return <span style={{fontSize:10,color:"#475569"}}>{s||"—"}</span>;
+  return (
+    <span style={{display:"inline-block",background:st.bg,color:st.color,border:`1px solid ${st.color}44`,
+      borderRadius:4,padding:small?"1px 6px":"2px 8px",fontSize:small?10:11,fontWeight:600,whiteSpace:"nowrap"}}>
+      {st.label}
+    </span>
+  );
+}
+
+function TaskCard({ task, isConflict }) {
+  const color = PROJ_COLORS[task["проект"]] || "#3b82f6";
+  return (
+    <div style={{borderLeft:`3px solid ${isConflict?"#ef4444":color}`,
+      background:isConflict?"rgba(239,68,68,0.08)":"rgba(255,255,255,0.03)",
+      borderRadius:"0 6px 6px 0",padding:"5px 8px",marginBottom:4}}>
+      <div style={{fontWeight:700,color:isConflict?"#f87171":color,fontSize:11,marginBottom:2}}>
+        {isConflict&&"⚡ "}{task["серия"]}
+        <span style={{fontWeight:400,color:"#475569",marginLeft:5,fontSize:10}}>{task["проект"]}</span>
+      </div>
+      {task["заметка / факт"]&&<div style={{color:"#94a3b8",fontSize:10,lineHeight:1.3,marginBottom:3}}>{task["заметка / факт"]}</div>}
+      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+        <StatusBadge s={task["статус"]} small/>
+        <span style={{color:"#475569",fontSize:10}}>{task["с"]}:00–{task["до"]}:00</span>
+      </div>
+    </div>
+  );
+}
+
+// ── ПРОЕКТЫ ───────────────────────────────────────────────────────
+function ProjectsView({ tasks, conflictIds }) {
+  const projects = useMemo(()=>[...new Set(tasks.map(t=>t["проект"]))].sort(),[tasks]);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:28}}>
+      {projects.map(proj => {
+        const pTasks = tasks.filter(t=>t["проект"]===proj);
+        const projColor = PROJ_COLORS[proj]||"#3b82f6";
+        const seriesList = [...new Set(pTasks.map(t=>t["серия"]))].sort();
+        return (
+          <div key={proj}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${projColor}33`}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:projColor,flexShrink:0,boxShadow:`0 0 8px ${projColor}`}}/>
+              <span style={{fontSize:18,fontWeight:700,color:"#fff"}}>{proj}</span>
+              <span style={{fontSize:12,color:"#475569"}}>{seriesList.length} серий в работе</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+              {seriesList.map(series => {
+                const sTasks = pTasks.filter(t=>t["серия"]===series);
+                const maxOrder = Math.max(...sTasks.map(t=>STATUS_ORDER.indexOf(t["статус"])).filter(x=>x>=0),-1);
+                const curStatus = maxOrder>=0 ? STATUS_ORDER[maxOrder] : sTasks[0]?.["статус"]||"";
+                const st = STATUSES[curStatus];
+                const hasConflict = sTasks.some(t=>conflictIds.has(t._id));
+                const workers = [...new Set(sTasks.map(t=>t["кто"]))];
+                const note = [...sTasks].reverse().find(t=>t["заметка / факт"])?.["заметка / факт"]||"";
+                return (
+                  <div key={series} style={{background:"#1e293b",
+                    border:`1px solid ${hasConflict?"rgba(239,68,68,0.4)":"#334155"}`,
+                    borderTop:`3px solid ${st?st.color:projColor}`,borderRadius:8,padding:"12px 14px"}}>
+                    <div style={{fontWeight:700,color:"#fff",fontSize:14,marginBottom:8}}>
+                      {hasConflict&&<span style={{color:"#ef4444"}}>⚡ </span>}{series}
+                    </div>
+                    <StatusBadge s={curStatus}/>
+                    {note&&<div style={{marginTop:8,fontSize:12,color:"#94a3b8",lineHeight:1.5}}>{note}</div>}
+                    {workers.length>0&&(
+                      <div style={{marginTop:10,display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {workers.map(w=><span key={w} style={{background:"rgba(255,255,255,0.06)",border:"1px solid #334155",borderRadius:4,padding:"1px 7px",fontSize:10,color:"#64748b"}}>{w}</span>)}
+                      </div>
+                    )}
+                    <div style={{marginTop:12,display:"flex",gap:2}}>
+                      {STATUS_ORDER.map(st2=>{
+                        const i2=STATUS_ORDER.indexOf(st2), ci=STATUS_ORDER.indexOf(curStatus);
+                        const sc=STATUSES[st2];
+                        return <div key={st2} title={sc?.label} style={{flex:1,height:4,borderRadius:2,
+                          background:st2===curStatus?(sc?.color||projColor):i2<ci?"#334155":"#1e293b",
+                          opacity:i2<ci?0.5:1}}/>;
+                      })}
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                      <span style={{fontSize:9,color:"#334155"}}>синхра</span>
+                      <span style={{fontSize:9,color:"#334155"}}>сдача</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ОБЩИЙ РЕНДЕР ДНЯ (колонка в сетке) ────────────────────────────
+function DayColumn({ dayKey, dayTasks, conflictIds, people, compact }) {
+  const hasConflict = dayTasks.some(t=>conflictIds.has(t._id));
+  const label = dayLabel(dayKey);
+
+  return (
+    <div>
+      <div style={{padding:compact?"5px 8px":"8px 10px",
+        background:hasConflict?"rgba(239,68,68,0.12)":"#1e293b",
+        borderRadius:"6px 6px 0 0",
+        borderBottom:`2px solid ${hasConflict?"#ef4444":"#3b82f6"}`,
+        fontSize:compact?11:12,fontWeight:700,
+        color:hasConflict?"#f87171":"#93c5fd",
+        display:"flex",justifyContent:"space-between"}}>
+        <span>{label}</span>
+        {hasConflict&&<span>⚡</span>}
+      </div>
+      <div style={{background:"#1e293b",borderRadius:"0 0 6px 6px",border:"1px solid #334155",
+        borderTop:"none",padding:compact?6:8,minHeight:compact?60:100}}>
+        {people.map(person=>{
+          const pt = dayTasks.filter(t=>t["кто"]===person);
+          if (!pt.length) return null;
+          return (
+            <div key={person} style={{marginBottom:compact?5:8}}>
+              <div style={{fontSize:compact?9:10,color:"#475569",letterSpacing:1,marginBottom:2}}>{person.toUpperCase()}</div>
+              {pt.map(t=><TaskCard key={t._id} task={t} isConflict={conflictIds.has(t._id)}/>)}
+            </div>
+          );
+        })}
+        {!dayTasks.length&&<div style={{color:"#334155",fontSize:12,paddingTop:8}}>нет задач</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── ПО ДНЯМ ───────────────────────────────────────────────────────
+function DaysView({ tasks, conflictIds, groupBy, filterPerson, filterProject }) {
+  const allPeople = useMemo(()=>[...new Set(tasks.map(t=>t["кто"]))].sort(),[tasks]);
+
+  const filtered = useMemo(()=>{
+    let r = tasks;
+    if (filterPerson)  r = r.filter(t=>t["кто"]===filterPerson);
+    if (filterProject) r = r.filter(t=>t["проект"]===filterProject);
+    return r;
+  },[tasks,filterPerson,filterProject]);
+
+  const peopleCols = filterPerson ? [filterPerson] : allPeople;
+
+  if (groupBy==="day") {
+    const dayKeys = [...new Set(filtered.map(t=>t._dayKey))].sort();
+    return (
+      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dayKeys.length,7)},1fr)`,gap:10}}>
+        {dayKeys.map(dk=>(
+          <DayColumn key={dk} dayKey={dk}
+            dayTasks={filtered.filter(t=>t._dayKey===dk)}
+            conflictIds={conflictIds} people={peopleCols}/>
+        ))}
+      </div>
+    );
+  }
+
+  // Неделя или месяц — группируем
+  const groupMap = {};
+  filtered.forEach(t=>{
+    const k = groupBy==="week" ? t._weekKey : t._monthKey;
+    if (!groupMap[k]) groupMap[k]=[];
+    groupMap[k].push(t);
+  });
+  const groups = Object.entries(groupMap).sort(([a],[b])=>a.localeCompare(b));
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:24}}>
+      {groups.map(([gk, gTasks])=>{
+        const sample = gTasks[0];
+        const title = groupBy==="week" ? `Неделя ${weekLabel(sample["день"])}` : monthLabel(sample["день"]);
+        const dayKeys = [...new Set(gTasks.map(t=>t._dayKey))].sort();
+        return (
+          <div key={gk}>
+            <div style={{fontSize:13,fontWeight:700,color:"#93c5fd",marginBottom:10,
+              paddingBottom:8,borderBottom:"1px solid #1e293b",display:"flex",justifyContent:"space-between"}}>
+              <span>{title}</span>
+              <span style={{fontWeight:400,fontSize:11,color:"#475569"}}>{gTasks.length} смен</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dayKeys.length,7)},1fr)`,gap:8}}>
+              {dayKeys.map(dk=>(
+                <DayColumn key={dk} dayKey={dk} compact
+                  dayTasks={gTasks.filter(t=>t._dayKey===dk)}
+                  conflictIds={conflictIds} people={peopleCols}/>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ПО ЛЮДЯМ ─────────────────────────────────────────────────────
+function PeopleView({ tasks, conflictIds, groupBy, filterPerson, filterProject }) {
+  const allPeople = useMemo(()=>[...new Set(tasks.map(t=>t["кто"]))].sort(),[tasks]);
+
+  const baseTasks = useMemo(()=>{
+    let r = tasks;
+    if (filterProject) r = r.filter(t=>t["проект"]===filterProject);
+    return r;
+  },[tasks,filterProject]);
+
+  const showPeople = filterPerson ? [filterPerson] : allPeople;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:24}}>
+      {showPeople.map(person=>{
+        const pTasks = baseTasks.filter(t=>t["кто"]===person);
+        if (!pTasks.length) return null;
+        const conflictDays = [...new Set(pTasks.filter(t=>conflictIds.has(t._id)).map(t=>t._dayKey))];
+
+        const groupMap = {};
+        pTasks.forEach(t=>{
+          const k = groupBy==="week" ? t._weekKey : groupBy==="month" ? t._monthKey : t._dayKey;
+          if (!groupMap[k]) groupMap[k]=[];
+          groupMap[k].push(t);
+        });
+        const groups = Object.entries(groupMap).sort(([a],[b])=>a.localeCompare(b));
+
+        return (
+          <div key={person}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:34,height:34,borderRadius:"50%",background:"#1e293b",border:"2px solid #3b82f6",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#3b82f6"}}>
+                {person[0]}
+              </div>
+              <span style={{fontSize:16,fontWeight:700}}>{person}</span>
+              {conflictDays.length>0&&(
+                <span style={{background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.4)",
+                  borderRadius:12,padding:"2px 10px",fontSize:11,color:"#f87171"}}>
+                  ⚡ конфликты: {conflictDays.map(d=>dayLabel(d)).join(", ")}
+                </span>
+              )}
+            </div>
+
+            {groupBy==="day" ? (
+              // Старый вид: сетка по дням
+              <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(groups.length,7)},1fr)`,gap:8}}>
+                {groups.map(([dk,gtasks])=>{
+                  const hasC=gtasks.some(t=>conflictIds.has(t._id));
+                  return (
+                    <div key={dk} style={{background:hasC?"rgba(239,68,68,0.05)":"#1e293b",
+                      border:`1px solid ${hasC?"rgba(239,68,68,0.35)":"#334155"}`,
+                      borderRadius:8,padding:"8px 10px",minHeight:80}}>
+                      <div style={{fontSize:10,color:hasC?"#f87171":"#475569",marginBottom:6,letterSpacing:1}}>
+                        {dayLabel(dk)}{hasC&&" ⚡"}
+                      </div>
+                      {gtasks.map(t=><TaskCard key={t._id} task={t} isConflict={conflictIds.has(t._id)}/>)}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Неделя / месяц
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {groups.map(([gk,gtasks])=>{
+                  const sample=gtasks[0];
+                  const title=groupBy==="week"?`Неделя ${weekLabel(sample["день"])}`:monthLabel(sample["день"]);
+                  const dayKeys=[...new Set(gtasks.map(t=>t._dayKey))].sort();
+                  return (
+                    <div key={gk} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:12}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#64748b",marginBottom:10}}>{title}</div>
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dayKeys.length,7)},1fr)`,gap:6}}>
+                        {dayKeys.map(dk=>{
+                          const dtasks=gtasks.filter(t=>t._dayKey===dk);
+                          const hasC=dtasks.some(t=>conflictIds.has(t._id));
+                          return (
+                            <div key={dk} style={{background:hasC?"rgba(239,68,68,0.05)":"rgba(255,255,255,0.02)",
+                              border:`1px solid ${hasC?"rgba(239,68,68,0.3)":"#263352"}`,borderRadius:6,padding:"6px 8px"}}>
+                              <div style={{fontSize:9,color:hasC?"#f87171":"#334155",marginBottom:4}}>
+                                {dayLabel(dk)}{hasC&&" ⚡"}
+                              </div>
+                              {dtasks.map(t=><TaskCard key={t._id} task={t} isConflict={conflictIds.has(t._id)}/>)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── КОНФЛИКТЫ ─────────────────────────────────────────────────────
+function ConflictsView({ details }) {
+  if (!details.length) return (
+    <div style={{textAlign:"center",padding:"60px 20px",color:"#475569"}}>
+      <div style={{fontSize:36,marginBottom:12}}>✓</div>
+      <div style={{fontSize:16,fontWeight:700,color:"#94a3b8"}}>Конфликтов нет</div>
+      <div style={{fontSize:13,marginTop:6}}>Все смены расставлены корректно</div>
+    </div>
+  );
+
+  const byDay = {};
+  details.forEach(c=>{ if(!byDay[c.dayStr]) byDay[c.dayStr]=[]; byDay[c.dayStr].push(c); });
+
+  return (
+    <div>
+      <div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,
+        padding:"10px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:20}}>⚡</span>
+        <div>
+          <span style={{fontWeight:700,color:"#f87171",fontSize:14}}>Конфликтов: {details.length}</span>
+          <span style={{color:"#64748b",fontSize:12,marginLeft:10}}>один человек — несколько задач в пересекающееся время</span>
+        </div>
+      </div>
+
+      {Object.entries(byDay).sort(([a],[b])=>a.localeCompare(b)).map(([day,pairs])=>(
+        <div key={day} style={{marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <span style={{fontSize:12,fontWeight:700,color:"#f87171"}}>{dayLabel(day)}</span>
+            <div style={{flex:1,height:1,background:"rgba(239,68,68,0.2)"}}/>
+            <span style={{fontSize:11,color:"#ef444488"}}>{pairs.length} конф.</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {pairs.map((p,i)=>{
+              const colorA=PROJ_COLORS[p.taskA["проект"]]||"#64748b";
+              const colorB=PROJ_COLORS[p.taskB["проект"]]||"#64748b";
+              const fromA=parseInt(p.taskA["с"])||0, toA=parseInt(p.taskA["до"])||0;
+              const fromB=parseInt(p.taskB["с"])||0, toB=parseInt(p.taskB["до"])||0;
+              const minT=8, maxT=22, range=maxT-minT;
+              const pct=v=>`${((v-minT)/range)*100}%`;
+              return (
+                <div key={i} style={{background:"#1e293b",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"12px 16px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                    <div style={{width:28,height:28,borderRadius:7,background:"#0f172a",display:"flex",
+                      alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,
+                      color:"#ef4444",border:"1px solid rgba(239,68,68,0.4)"}}>
+                      {p.person[0]}
+                    </div>
+                    <span style={{fontWeight:700,fontSize:14}}>{p.person}</span>
+                    <span style={{color:"#64748b",fontSize:12}}>— пересечение {p.overlapFrom}:00–{p.overlapTo}:00 ({p.overlapTo-p.overlapFrom}ч)</span>
+                  </div>
+                  {/* Таймлайн */}
+                  <div style={{position:"relative",height:48,marginBottom:12}}>
+                    {[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].map(h=>(
+                      <div key={h} style={{position:"absolute",left:pct(h),top:0,bottom:0,borderLeft:"1px solid #263352",pointerEvents:"none"}}>
+                        <span style={{position:"absolute",bottom:0,fontSize:8,color:"#334155",paddingLeft:2}}>{h}</span>
+                      </div>
+                    ))}
+                    <div style={{position:"absolute",left:pct(fromA),width:`${((toA-fromA)/range)*100}%`,
+                      top:4,height:16,background:colorA,borderRadius:3,opacity:.9,
+                      display:"flex",alignItems:"center",paddingLeft:4,overflow:"hidden"}}>
+                      <span style={{fontSize:9,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>{p.taskA["проект"]} {p.taskA["серия"]}</span>
+                    </div>
+                    <div style={{position:"absolute",left:pct(fromB),width:`${((toB-fromB)/range)*100}%`,
+                      top:24,height:16,background:colorB,borderRadius:3,opacity:.9,
+                      display:"flex",alignItems:"center",paddingLeft:4,overflow:"hidden"}}>
+                      <span style={{fontSize:9,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>{p.taskB["проект"]} {p.taskB["серия"]}</span>
+                    </div>
+                    <div style={{position:"absolute",left:pct(p.overlapFrom),
+                      width:`${((p.overlapTo-p.overlapFrom)/range)*100}%`,
+                      top:0,height:48,background:"rgba(239,68,68,0.12)",
+                      border:"1px solid rgba(239,68,68,0.35)",borderRadius:3}}/>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {[p.taskA,p.taskB].map((t,ti)=>{
+                      const c=ti===0?colorA:colorB;
+                      return (
+                        <div key={ti} style={{background:"#0f172a",borderRadius:6,padding:"8px 10px",borderLeft:`3px solid ${c}`}}>
+                          <div style={{fontWeight:700,fontSize:12,color:c,marginBottom:4}}>{t["проект"]} · {t["серия"]}</div>
+                          <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
+                            <StatusBadge s={t["статус"]} small/>
+                            <span style={{fontSize:10,color:"#475569"}}>{t["с"]}:00–{t["до"]}:00</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────
+function App() {
+  const [tasks,     setTasks]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [isDemo,    setIsDemo]    = useState(false);
+  const [view,      setView]      = useState("projects");
+  const [groupBy,   setGroupBy]   = useState("day");
+  const [filterPerson,  setFilterPerson]  = useState("");
+  const [filterProject, setFilterProject] = useState("");
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  function load(demo=false) {
+    setLoading(true);
+    if (demo) {
+      setTasks(parseCSV(DEMO_CSV)); setIsDemo(true);
+      setLastUpdate(new Date()); setLoading(false); return;
+    }
+    fetch(SHEET_CSV_URL)
+      .then(r=>r.text())
+      .then(t=>{ setTasks(parseCSV(t)); setIsDemo(false); setLastUpdate(new Date()); })
+      .catch(()=>{ setTasks(parseCSV(DEMO_CSV)); setIsDemo(true); setLastUpdate(new Date()); })
+      .finally(()=>setLoading(false));
+  }
+
+  useEffect(()=>{ load(false); },[]);
+
+  const { ids: conflictIds, details: conflictDetails } = useMemo(()=>getConflicts(tasks),[tasks]);
+  const people   = useMemo(()=>[...new Set(tasks.map(t=>t["кто"]))].sort(),[tasks]);
+  const projects = useMemo(()=>[...new Set(tasks.map(t=>t["проект"]))].sort(),[tasks]);
+  const conflictCount = conflictDetails.length;
+
+  const VIEWS = [
+    { id:"projects",  label:"По проектам" },
+    { id:"days",      label:"По дням" },
+    { id:"people",    label:"По людям" },
+    { id:"conflicts", label:`Конфликты${conflictCount?` ⚡${conflictCount}`:""}` },
+  ];
+
+  const showFilters  = view==="days" || view==="people";
+  const showGroupBy  = view==="days" || view==="people";
+
+  return (
+    <div style={{background:"#0f172a",minHeight:"100vh",color:"#e2e8f0",fontFamily:"system-ui,-apple-system,sans-serif"}}>
+
+      {/* ШАПКА */}
+      <div style={{background:"#1e293b",borderBottom:"1px solid #334155",padding:"14px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+          <div>
+            <div style={{fontSize:11,color:"#64748b",letterSpacing:2,textTransform:"uppercase"}}>
+              ББХ · Постпродакшн
+              {isDemo&&<span style={{marginLeft:8,color:"#f59e0b",background:"rgba(245,158,11,0.1)",
+                border:"1px solid rgba(245,158,11,0.3)",borderRadius:3,padding:"1px 6px",fontSize:10}}>ДЕМО</span>}
+            </div>
+            <div style={{fontSize:20,fontWeight:700,color:"#fff",marginTop:2}}>Загрузка команды</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            {conflictCount>0&&(
+              <button onClick={()=>setView("conflicts")}
+                style={{background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.4)",
+                  borderRadius:8,padding:"6px 14px",color:"#f87171",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                ⚡ {conflictCount} конфликт{conflictCount>1?"а":""}
+              </button>
+            )}
+            {lastUpdate&&<span style={{fontSize:11,color:"#334155"}}>{lastUpdate.toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"})}</span>}
+            <button onClick={()=>load(false)} style={{background:"#1e3a5f",border:"1px solid #2d5180",
+              color:"#60a5fa",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>
+              ↻ Обновить
+            </button>
+            <button onClick={()=>load(true)} style={{background:"transparent",border:"1px solid #334155",
+              color:"#475569",padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
+              Демо
+            </button>
+          </div>
+        </div>
+
+        {/* Вкладки */}
+        <div style={{display:"flex",background:"#0f172a",borderRadius:8,border:"1px solid #334155",
+          overflow:"hidden",marginTop:14,width:"fit-content"}}>
+          {VIEWS.map(({id,label})=>(
+            <button key={id} onClick={()=>setView(id)} style={{
+              padding:"7px 14px",border:"none",borderRight:"1px solid #334155",cursor:"pointer",
+              fontSize:12,fontFamily:"inherit",
+              background:view===id?"#3b82f6":"transparent",
+              color:id==="conflicts"&&conflictCount?(view===id?"#fff":"#f87171"):(view===id?"#fff":"#64748b"),
+              fontWeight:view===id?700:400}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Фильтр по людям + проектам */}
+        {showFilters&&(
+          <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap",alignItems:"center"}}>
+            {/* Люди */}
+            {["все",...people].map(p=>{
+              const isAll=p==="все";
+              const active=isAll?!filterPerson:filterPerson===p;
+              const hasC=!isAll&&tasks.some(t=>t["кто"]===p&&conflictIds.has(t._id));
+              return (
+                <button key={p} onClick={()=>setFilterPerson(isAll?"":p)} style={{
+                  padding:"4px 14px",borderRadius:20,border:"1px solid",cursor:"pointer",
+                  fontSize:12,fontFamily:"inherit",
+                  borderColor:active?"#3b82f6":"#334155",
+                  background:active?"rgba(59,130,246,0.2)":"transparent",
+                  color:active?"#93c5fd":"#64748b",
+                  display:"flex",alignItems:"center",gap:6}}>
+                  {p}{hasC&&<span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>}
+                </button>
+              );
+            })}
+            <span style={{color:"#263352",fontSize:14,margin:"0 4px"}}>│</span>
+            {/* Проекты */}
+            {["все проекты",...projects].map(proj=>{
+              const isAll=proj==="все проекты";
+              const active=isAll?!filterProject:filterProject===proj;
+              const color=PROJ_COLORS[proj]||"#64748b";
+              return (
+                <button key={proj} onClick={()=>setFilterProject(isAll?"":proj)} style={{
+                  padding:"4px 14px",borderRadius:20,border:"1px solid",cursor:"pointer",
+                  fontSize:12,fontFamily:"inherit",
+                  borderColor:active?(isAll?"#3b82f6":color):"#334155",
+                  background:active?(isAll?"rgba(59,130,246,0.2)":`${color}22`):"transparent",
+                  color:active?(isAll?"#93c5fd":color):"#64748b",
+                  display:"flex",alignItems:"center",gap:5}}>
+                  {!isAll&&<span style={{width:8,height:8,borderRadius:2,background:color,display:"inline-block",flexShrink:0}}/>}
+                  {proj}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Группировка */}
+        {showGroupBy&&(
+          <div style={{display:"flex",gap:4,marginTop:8}}>
+            {[["day","По дням"],["week","По неделям"],["month","По месяцам"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setGroupBy(v)} style={{
+                padding:"3px 12px",borderRadius:4,border:"1px solid",cursor:"pointer",fontSize:11,fontFamily:"inherit",
+                borderColor:groupBy===v?"#475569":"#263352",
+                background:groupBy===v?"#334155":"transparent",
+                color:groupBy===v?"#cbd5e1":"#475569"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* КОНТЕНТ */}
+      <div style={{padding:"16px 20px"}}>
+        {loading ? (
+          <div style={{textAlign:"center",padding:60,color:"#475569",fontSize:13}}>загрузка...</div>
+        ) : tasks.length===0 ? (
+          <div style={{textAlign:"center",padding:60,color:"#475569"}}>
+            Нет данных.{" "}
+            <button onClick={()=>load(true)} style={{color:"#60a5fa",background:"none",border:"none",cursor:"pointer",fontSize:13}}>Загрузить демо</button>
+          </div>
+        ) : (
+          <>
+            {view==="projects"  && <ProjectsView  tasks={tasks} conflictIds={conflictIds}/>}
+            {view==="days"      && <DaysView       tasks={tasks} conflictIds={conflictIds} groupBy={groupBy} filterPerson={filterPerson} filterProject={filterProject}/>}
+            {view==="people"    && <PeopleView     tasks={tasks} conflictIds={conflictIds} groupBy={groupBy} filterPerson={filterPerson} filterProject={filterProject}/>}
+            {view==="conflicts" && <ConflictsView  details={conflictDetails}/>}
+          </>
+        )}
+
+        {/* Легенда */}
+        {view!=="conflicts"&&tasks.length>0&&(
+          <div style={{marginTop:24,paddingTop:16,borderTop:"1px solid #1e293b",display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontSize:11,color:"#334155",letterSpacing:2}}>СТАТУСЫ:</span>
+            {STATUS_ORDER.map(s=><StatusBadge key={s} s={s} small/>)}
+            <span style={{fontSize:12,color:"#f87171",marginLeft:8}}>⚡ = конфликт по времени</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
