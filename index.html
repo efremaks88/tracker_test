@@ -527,14 +527,17 @@ function projAbbr(projects,projId){
 }
 
 // ── ОБЩИЕ КОМПОНЕНТЫ ─────────────────────────────────────────────────
-function Modal({title,onClose,wide,locked,children}){
+function Modal({title,onClose,wide,onSubmit,children}){
   useEffect(()=>{
-    const h=(e)=>{if(e.key==="Escape")onClose();};
+    const h=(e)=>{
+      if(e.key==="Escape") onClose();
+      if(e.altKey&&(e.key==="Enter"||e.code==="Enter")) {e.preventDefault();onSubmit&&onSubmit();}
+    };
     document.addEventListener("keydown",h);
     return ()=>document.removeEventListener("keydown",h);
-  },[onClose]);
+  },[onClose,onSubmit]);
   return (
-    <div onClick={e=>{if(!locked&&e.target===e.currentTarget)onClose();}}
+    <div onClick={e=>{/* backdrop locked */}}
       style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",
         display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:12,
@@ -753,8 +756,9 @@ function StageEditModal({stage,roles,stageGroups,onSave,onClose}){
         :[...f.rolesRequired,rid]
     }));
   }
+  function handleSave(){if(!form.label.trim()){alert("Введите название");return;}onSave(form);}
   return (
-    <Modal title={`Этап: ${stage.label}`} onClose={onClose}>
+    <Modal title={`Этап: ${stage.label}`} onClose={onClose} onSubmit={handleSave}>
       <Field label="Название">
         <Inp value={form.label} onChange={v=>setForm(f=>({...f,label:v}))} placeholder="Монтаж"/>
       </Field>
@@ -806,16 +810,13 @@ function StageEditModal({stage,roles,stageGroups,onSave,onClose}){
       </Field>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
         <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
-        <Btn variant="primary" onClick={()=>{
-          if(!form.label.trim()){alert("Введите название");return;}
-          onSave(form);
-        }}>Сохранить</Btn>
+        <Btn variant="primary" onClick={handleSave}>Сохранить</Btn>
       </div>
     </Modal>
   );
 }
 
-function DirectoryView({data,onUpdate}){
+function DirectoryView({data,onUpdate,onBatchUpdate}){
   const [tab,setTab]=useState("roles");
   const [personModal,setPersonModal]=useState(null);
   const [stageModal,setStageModal]=useState(null);
@@ -837,7 +838,9 @@ function DirectoryView({data,onUpdate}){
   }
   function deleteRole(id){
     if(!window.confirm(`Удалить роль "${id}"?`)) return;
-    onUpdate("roles",data.roles.filter(r=>r.id!==id));
+    const newRoles=data.roles.filter(r=>r.id!==id);
+    const newStages=stages.map(s=>({...s,rolesRequired:(s.rolesRequired||[]).filter(r=>r!==id)}));
+    onBatchUpdate({roles:newRoles,stages:newStages});
   }
   function savePerson(person){
     let people=[...data.people];
@@ -995,11 +998,18 @@ function DirectoryView({data,onUpdate}){
               <div style={{flex:1}}>
                 <span style={{fontSize:13,fontWeight:600}}>{stage.label}</span>
                 {!stage.needsExecutor&&<span style={{fontSize:9,color:"#64748b",marginLeft:6}}>без исполнителя</span>}
-                {stage.rolesRequired.length>0&&(
-                  <div style={{fontSize:10,color:"#475569",marginTop:1}}>
-                    Роли: {stage.rolesRequired.join(", ")}
-                  </div>
-                )}
+                {(()=>{
+                  const knownRoles=(stage.rolesRequired||[]).filter(rid=>data.roles.find(r=>r.id===rid));
+                  const missing=(stage.rolesRequired||[]).filter(rid=>!data.roles.find(r=>r.id===rid));
+                  return (knownRoles.length>0||missing.length>0)&&(
+                    <div style={{fontSize:10,color:"#475569",marginTop:1}}>
+                      Роли: {knownRoles.map(rid=>data.roles.find(r=>r.id===rid)?.label||rid).join(", ")}
+                      {missing.length>0&&<span style={{color:"#ef4444",marginLeft:4}}>
+                        ⚠ удалены: {missing.join(", ")}
+                      </span>}
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{display:"flex",gap:4,alignItems:"center"}}>
                 <div style={{width:40,height:18,borderRadius:3,background:colorToBg(stage.color),
@@ -1136,8 +1146,9 @@ function PersonModal({person,roles,onSave,onDelete,onClose}){
   const [form,setForm]=useState({name:person.name||"",roles:[...(person.roles||[])],active:person.active!==false});
   const isNew=!person.id;
   function toggleRole(id){setForm(f=>({...f,roles:f.roles.includes(id)?f.roles.filter(r=>r!==id):[...f.roles,id]}));}
+  function handleSave(){if(!form.name.trim()){alert("Введите имя");return;}onSave({...person,...form});}
   return (
-    <Modal title={isNew?"Новый сотрудник":"Редактировать сотрудника"} onClose={onClose}>
+    <Modal title={isNew?"Новый сотрудник":"Редактировать сотрудника"} onClose={onClose} onSubmit={handleSave}>
       <Field label="Имя / Фамилия">
         <Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Иванов"/>
       </Field>
@@ -1164,7 +1175,7 @@ function PersonModal({person,roles,onSave,onDelete,onClose}){
         <div>{!isNew&&<Btn variant="danger" onClick={()=>onDelete(person.id)}>Удалить</Btn>}</div>
         <div style={{display:"flex",gap:8}}>
           <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
-          <Btn variant="primary" onClick={()=>{if(!form.name.trim()){alert("Введите имя");return;}onSave({...person,...form});}}>Сохранить</Btn>
+          <Btn variant="primary" onClick={handleSave}>Сохранить</Btn>
         </div>
       </div>
     </Modal>
@@ -1264,10 +1275,27 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject}){
                     {proj.abbr&&<span style={{fontSize:11,background:"rgba(255,255,255,0.07)",
                       border:"1px solid #334155",borderRadius:4,padding:"1px 6px",
                       color:"#64748b",fontFamily:"monospace"}}>{proj.abbr}</span>}
-                    <span style={{fontSize:11,background:`${statusColors[proj.status]||"#64748b"}22`,
-                      color:statusColors[proj.status]||"#64748b",
-                      border:`1px solid ${statusColors[proj.status]||"#64748b"}44`,
-                      borderRadius:4,padding:"1px 8px"}}>{proj.status||"в работе"}</span>
+                    <select
+                      value={proj.status||"в работе"}
+                      onClick={e=>e.stopPropagation()}
+                      onChange={e=>{
+                        e.stopPropagation();
+                        const updated=data.projects.map(p=>p.id===proj.id?{...p,status:e.target.value}:p);
+                        onUpdate("projects",updated);
+                      }}
+                      style={{fontSize:11,fontWeight:700,
+                        background:`${statusColors[proj.status]||"#64748b"}22`,
+                        color:statusColors[proj.status]||"#64748b",
+                        border:`1px solid ${statusColors[proj.status]||"#64748b"}55`,
+                        borderRadius:4,padding:"2px 6px",cursor:"pointer",outline:"none",
+                        appearance:"none",WebkitAppearance:"none"}}>
+                      {PROJECT_STATUSES.map(s=>(
+                        <option key={s.value||s} value={s.value||s}
+                          style={{background:"#1e293b",color:"#e2e8f0"}}>
+                          {s.label||s}
+                        </option>
+                      ))}
+                    </select>
                     {proj.season&&<span style={{fontSize:11,background:"rgba(255,255,255,0.05)",
                       border:"1px solid #334155",borderRadius:4,padding:"1px 8px",color:"#64748b"}}>
                       Сезон {proj.season}
@@ -1318,15 +1346,15 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject}){
                         onDoubleClick={()=>setDirectEditSeries({ser,proj})}
                         title="Двойной клик — редактировать серию"
                         style={{background:"#0f172a",cursor:"pointer",
-                          borderTop:`2px solid ${borderColor}`,borderRadius:6,padding:"8px 10px"}}>
+                          borderTop:`2px solid ${borderColor}`,borderRadius:6,padding:"10px 12px",minHeight:86}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                           <span style={{fontWeight:700,fontSize:12}}>{ser.name}</span>
                           {isManual&&<span title="Статус задан вручную" style={{fontSize:9,color:"#f59e0b"}}>🔒</span>}
                         </div>
                         <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
                           {displayGroup?(
-                            <span style={{fontSize:11,background:`${borderColor}22`,color:borderColor,
-                              border:`1px solid ${borderColor}44`,borderRadius:4,padding:"1px 7px"}}>
+                            <span style={{fontSize:11,fontWeight:700,background:`${borderColor}22`,color:borderColor,
+                              border:`1px solid ${borderColor}44`,borderRadius:4,padding:"2px 8px"}}>
                               {displayGroup.label}
                             </span>
                           ):<span style={{fontSize:11,color:"#334155"}}>—</span>}
@@ -1382,10 +1410,11 @@ function ProjectModal({project,data,onSave,onDelete,onClose}){
   const [form,setForm]=useState({...project});
   const isNew=!project.id;
   const f=form; const sf=v=>setForm(p=>({...p,...v}));
-  const managers=data.people.filter(p=>p.active!==false&&p.roles.some(r=>["выпуск","продюсер"].includes(r)));
+  const managers=data.people.filter(p=>p.active!==false);
 
+  function handleSave(){if(!f.name.trim()){alert("Введите название");return;}onSave(f);}
   return (
-    <Modal title={isNew?"Новый проект":"Редактировать проект"} onClose={onClose}>
+    <Modal title={isNew?"Новый проект":"Редактировать проект"} onClose={onClose} onSubmit={handleSave}>
       <Field label="Название"><Inp value={f.name} onChange={v=>sf({name:v})} placeholder="Название проекта"/></Field>
       <Field label="Аббревиатура (для Ганта)">
         <Inp value={f.abbr||""} onChange={v=>sf({abbr:v})} placeholder="СВ" style={{width:80}}/>
@@ -1419,7 +1448,7 @@ function ProjectModal({project,data,onSave,onDelete,onClose}){
         <div>{!isNew&&<Btn variant="danger" onClick={()=>onDelete(project.id)}>Удалить проект</Btn>}</div>
         <div style={{display:"flex",gap:8}}>
           <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
-          <Btn variant="primary" onClick={()=>{if(!f.name.trim()){alert("Введите название");return;}onSave(f);}}>
+          <Btn variant="primary" onClick={handleSave}>
             {isNew?"Создать проект":"Сохранить"}
           </Btn>
         </div>
@@ -1532,9 +1561,10 @@ function SeriesModal({series,onSave,onClose}){
   const f=form; const sf=v=>setForm(p=>({...p,...v}));
   const preOtkWarn=f.preOtkDate&&isNonWorkday(f.preOtkDate,holidays);
   const otkWarn=f.otkDate&&isNonWorkday(f.otkDate,holidays);
+  function handleSave(){if(!f.name.trim()){alert("Введите название серии");return;}onSave(f);}
 
   return (
-    <Modal title={isNew?"Новая серия":`Серия: ${series.name||"—"}`} onClose={onClose} wide>
+    <Modal title={isNew?"Новая серия":`Серия: ${series.name||"—"}`} onClose={onClose} wide onSubmit={handleSave}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
         <div>
           <Field label="Название серии">
@@ -1579,10 +1609,7 @@ function SeriesModal({series,onSave,onClose}){
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20,
         borderTop:"1px solid #334155",paddingTop:16}}>
         <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
-        <Btn variant="primary" onClick={()=>{
-          if(!f.name.trim()){alert("Введите название серии");return;}
-          onSave(f);
-        }}>{isNew?"Создать серию":"Сохранить"}</Btn>
+        <Btn variant="primary" onClick={handleSave}>{isNew?"Создать серию":"Сохранить"}</Btn>
       </div>
     </Modal>
   );
@@ -1774,21 +1801,42 @@ function CalendarView({data}){
 }
 
 // ── ГАНТ ─────────────────────────────────────────────────────────────
+function GanttTooltip({task,rect,stageMap}){
+  if(!task||!rect) return null;
+  const st=stageMap[task.status];
+  const W=220;
+  const vw=window.innerWidth; const vh=window.innerHeight;
+  let left=rect.right+10; if(left+W>vw-16) left=rect.left-W-10;
+  let top=rect.top; if(top+160>vh-16) top=Math.max(8,vh-176);
+  return (
+    <div style={{position:"fixed",left,top,zIndex:9999,width:W,
+      background:"#1e293b",border:"1px solid #475569",borderRadius:8,
+      padding:"10px 14px",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,0.65)"}}>
+      {st&&<div style={{marginBottom:6}}>
+        <span style={{background:colorToBg(st.color),border:`1px solid ${st.color}55`,
+          borderRadius:4,padding:"2px 8px",fontSize:11,color:st.color,fontWeight:600}}>
+          {st.label}
+        </span>
+      </div>}
+      {task.person&&<div style={{fontSize:13,color:"#e2e8f0",marginBottom:4,fontWeight:600}}>{task.person}</div>}
+      <div style={{fontSize:11,color:"#64748b",marginBottom:task.note?4:0}}>
+        {task.from}:00 – {task.to}:00 · {(task.to||0)-(task.from||0)} ч
+      </div>
+      {task.note&&<div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4,marginTop:4}}>{task.note}</div>}
+    </div>
+  );
+}
+
 function GanttView({data,onUpdate}){
   const {sorted:stages,stageMap,groupMap}=useContext(StagesCtx);
   const [weekOffset,setWeekOffset]=useState(0);
   const [taskModal,setTaskModal]=useState(null);
-  const [expandedRows,setExpandedRows]=useState(new Set());
-  const [compareMode,setCompareMode]=useState(false);
-  const [pinnedRows,setPinnedRows]=useState(new Set());
+  const [collapsedProjects,setCollapsedProjects]=useState(new Set());
+  const [expandedSeries,setExpandedSeries]=useState(new Set());
+  const [hoverTask,setHoverTask]=useState(null);
+  const [projectOrder,setProjectOrder]=useState(null);
   const dragRef=useRef(null);
-
-  function toggleExpand(key){
-    setExpandedRows(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);return n;});
-  }
-  function togglePin(key){
-    setPinnedRows(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);return n;});
-  }
+  const projDragRef=useRef(null);
 
   useEffect(()=>{
     function h(){setTaskModal({});}
@@ -1813,19 +1861,38 @@ function GanttView({data,onUpdate}){
 
   const todayStr=formatDate(new Date());
 
-  const rows=useMemo(()=>{
-    const result=[];
-    data.projects.filter(p=>p.status!=="архив").forEach(proj=>{
-      const fromSeries=(data.series||[]).filter(s=>s.projectId===proj.id)
-        .sort((a,b)=>(a.order||0)-(b.order||0)).map(s=>s.name);
-      const fromTasks=[...new Set(data.tasks.filter(t=>t.project===proj.id).map(t=>t.series))]
-        .filter(n=>!fromSeries.includes(n)).sort();
-      [...fromSeries,...fromTasks].forEach(series=>{
-        result.push({projId:proj.id,series,proj});
-      });
-    });
-    return result;
-  },[data]);
+  const orderedProjects=useMemo(()=>{
+    const active=data.projects.filter(p=>p.status!=="архив");
+    if(!projectOrder) return active;
+    return [
+      ...projectOrder.map(id=>active.find(p=>p.id===id)).filter(Boolean),
+      ...active.filter(p=>!projectOrder.includes(p.id))
+    ];
+  },[data.projects,projectOrder]);
+
+  function toggleCollapse(projId){
+    setCollapsedProjects(prev=>{const n=new Set(prev);n.has(projId)?n.delete(projId):n.add(projId);return n;});
+  }
+  function toggleExpandSer(key){
+    setExpandedSeries(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);return n;});
+  }
+
+  function handleProjDragStart(e,projId){
+    projDragRef.current=projId;
+    e.dataTransfer.effectAllowed="move";
+    e.dataTransfer.setData("text/plain",projId);
+  }
+  function handleProjDrop(e,targetId){
+    e.preventDefault(); e.stopPropagation();
+    const fromId=projDragRef.current; projDragRef.current=null;
+    if(!fromId||fromId===targetId) return;
+    const ids=orderedProjects.map(p=>p.id);
+    const fi=ids.indexOf(fromId); const ti=ids.indexOf(targetId);
+    if(fi<0||ti<0) return;
+    const newIds=[...ids];
+    newIds.splice(fi,1); newIds.splice(ti,0,fromId);
+    setProjectOrder(newIds);
+  }
 
   function saveTask(task){
     let tasks;
@@ -1838,7 +1905,6 @@ function GanttView({data,onUpdate}){
       if(task.id&&tasks.find(t=>t.id===task.id)) tasks=tasks.map(t=>t.id===task.id?task:t);
       else tasks.push({...task,id:genId(data.tasks)});
     }
-    // Снять manualStatus серии если новая задача выше по группе
     const savedTask=tasks.find(t=>t.id===(task.id||task))||task;
     const taskStage=stageMap[savedTask.status];
     const taskGroup=taskStage?.groupId?groupMap[taskStage.groupId]:null;
@@ -1861,26 +1927,18 @@ function GanttView({data,onUpdate}){
   function handleDrop(e,row,d){
     e.preventDefault();
     const drag=dragRef.current; if(!drag) return;
-    const {task,copy}=drag;
-    dragRef.current=null;
-
+    const {task,copy}=drag; dragRef.current=null;
     if(copy){
-      const newTask={...task,id:genId(data.tasks),day:d,
-        project:row.projId,series:row.series};
+      const newTask={...task,id:genId(data.tasks),day:d,project:row.projId,series:row.series};
       delete newTask._cascadeAll;
-      onUpdate("tasks",[...data.tasks,newTask]);
-      return;
+      onUpdate("tasks",[...data.tasks,newTask]); return;
     }
-
     if(d===task.day&&row.projId===task.project&&row.series===task.series) return;
-
     const hasTail=data.tasks.some(t=>
       t.project===task.project&&t.series===task.series&&t.day>task.day&&t.id!==task.id);
-
     const diff=(parseDate(d)-parseDate(task.day))/(1000*60*60*24);
-
     const applyMove=(cascade)=>{
-      let tasks=data.tasks.map(t=>{
+      const tasks=data.tasks.map(t=>{
         if(t.id===task.id) return {...t,day:d,project:row.projId,series:row.series};
         if(cascade&&t.project===task.project&&t.series===task.series&&t.day>task.day)
           return {...t,day:addDays(t.day,diff)};
@@ -1888,13 +1946,8 @@ function GanttView({data,onUpdate}){
       });
       onUpdate("tasks",tasks);
     };
-
-    if(hasTail&&diff!==0){
-      const ok=window.confirm("Сдвинуть весь хвост серии?");
-      applyMove(ok);
-    } else {
-      applyMove(false);
-    }
+    if(hasTail&&diff!==0){const ok=window.confirm("Сдвинуть весь хвост серии?");applyMove(ok);}
+    else applyMove(false);
   }
 
   const COL=52;
@@ -1918,42 +1971,33 @@ function GanttView({data,onUpdate}){
         <Btn variant="ghost" small onClick={()=>setWeekOffset(0)}>Сегодня</Btn>
         <Btn variant="ghost" onClick={()=>setWeekOffset(w=>w+1)}>След. неделя →</Btn>
         <div style={{flex:1}}/>
-        <Btn variant={compareMode?"primary":"ghost"} small
-          onClick={()=>{setCompareMode(m=>!m);setPinnedRows(new Set());}}>
-          {compareMode?`Сравнение (${pinnedRows.size})  ×`:"⊞ Сравнить серии"}
-        </Btn>
         <Btn variant="primary" onClick={()=>setTaskModal({})}>+ Задача</Btn>
       </div>
 
-      <div style={{overflow:"auto",maxHeight:"calc(100vh - 220px)",border:"1px solid #1e293b",borderRadius:8}}>
+      <div style={{overflow:"auto",maxHeight:"calc(100vh - 220px)",border:"1px solid #1e293b",borderRadius:8}}
+        onMouseLeave={()=>setHoverTask(null)}>
         <div style={{minWidth:200+COL*28}}>
-          {/* Шапка — sticky top */}
+          {/* Шапка */}
           <div style={{position:"sticky",top:0,zIndex:12}}>
-            {/* Строка месяцев */}
             <div style={{display:"flex"}}>
               <div style={{width:200,flexShrink:0,height:18,position:"sticky",left:0,zIndex:21,
                 background:"#060d1a",borderBottom:"1px solid #0f172a",borderRight:"1px solid #334155"}}/>
               {monthSpans.map((span,si)=>(
                 <div key={span.key} style={{width:COL*span.count,flexShrink:0,height:18,
-                  display:"flex",alignItems:"center",paddingLeft:6,
-                  background:"#060d1a",
-                  borderLeft:si===0?"none":"2px solid #334155",
-                  borderBottom:"1px solid #0f172a"}}>
+                  display:"flex",alignItems:"center",paddingLeft:6,background:"#060d1a",
+                  borderLeft:si===0?"none":"2px solid #334155",borderBottom:"1px solid #0f172a"}}>
                   <span style={{fontSize:9,color:"#475569",letterSpacing:1,textTransform:"uppercase"}}>
                     {span.label}
                   </span>
                 </div>
               ))}
             </div>
-            {/* Строка дней */}
             <div style={{display:"flex"}}>
               <div style={{width:200,flexShrink:0,height:44,position:"sticky",left:0,zIndex:20,
                 background:"#0f172a",borderBottom:"1px solid #334155",borderRight:"1px solid #334155"}}/>
               {days.map(d=>{
-                const pd=parseDate(d);
-                const isToday=d===todayStr;
-                const isMon=pd&&pd.getDay()===1;
-                const isSun=pd&&pd.getDay()===0;
+                const pd=parseDate(d); const isToday=d===todayStr;
+                const isMon=pd&&pd.getDay()===1; const isSun=pd&&pd.getDay()===0;
                 return (
                   <div key={d} style={{width:COL,flexShrink:0,display:"flex",flexDirection:"column",
                     alignItems:"center",justifyContent:"center",height:44,
@@ -1971,124 +2015,162 @@ function GanttView({data,onUpdate}){
           </div>
 
           {/* Строки */}
-          {(compareMode&&pinnedRows.size>0?rows.filter(r=>pinnedRows.has(`${r.projId}|${r.series}`)):rows).map((row,ri)=>{
-            const rowKey=`${row.projId}|${row.series}`;
-            const isExpanded=expandedRows.has(rowKey);
-            const isPinned=pinnedRows.has(rowKey);
-            const seriesTasks=data.tasks.filter(t=>t.project===row.projId&&t.series===row.series);
-            const subPeople=[...new Set(seriesTasks.map(t=>t.person).filter(Boolean))].sort();
-            return (
-            <React.Fragment key={ri}>
-            <div style={{display:"flex",height:52,background:ri%2===0?"#0a1220":"#060d1a"}}>
-              {/* Метка строки — sticky left */}
-              <div style={{width:200,flexShrink:0,position:"sticky",left:0,zIndex:5,
-                display:"flex",alignItems:"center",padding:"0 6px 0 10px",
-                borderBottom:"1px solid #1e293b",borderRight:"1px solid #334155",
-                background:ri%2===0?"#0f172a":"#0a1220"}}>
-                {compareMode&&(
-                  <input type="checkbox" checked={isPinned} onChange={()=>togglePin(rowKey)}
-                    style={{marginRight:6,accentColor:"#3b82f6",flexShrink:0}}/>
-                )}
-                <div style={{width:8,height:8,borderRadius:2,background:row.proj.color,flexShrink:0,marginRight:6}}/>
-                <div style={{overflow:"hidden",flex:1,cursor:"pointer"}}
-                  onDoubleClick={()=>toggleExpand(rowKey)}
-                  title="Двойной клик — развернуть/свернуть">
-                  <div style={{fontSize:10,color:"#475569",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                    {row.proj.name}
-                  </div>
-                  <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",display:"flex",alignItems:"center",gap:4}}>
-                    {row.series}
-                    <span style={{fontSize:9,color:isExpanded?"#3b82f6":"#334155"}}>{isExpanded?"▲":"▼"}</span>
-                  </div>
-                </div>
-              </div>
+          {orderedProjects.map((proj,pi)=>{
+            const isCollapsed=collapsedProjects.has(proj.id);
+            const projSeries=(data.series||[])
+              .filter(s=>s.projectId===proj.id)
+              .sort((a,b)=>(a.order||0)-(b.order||0));
+            const fromTasks=[...new Set(data.tasks.filter(t=>t.project===proj.id).map(t=>t.series))]
+              .filter(n=>!projSeries.find(s=>s.name===n)).sort();
+            const allSeries=[...projSeries,...fromTasks.map(n=>({id:n,name:n}))];
 
-              {/* Ячейки дней */}
-              {days.map(d=>{
-                const cellTasks=data.tasks.filter(t=>
-                  t.project===row.projId&&t.series===row.series&&t.day===d);
-                const isToday=d===todayStr;
-                const pd=parseDate(d);
-                const isMon=pd&&pd.getDay()===1;
-                return (
-                  <div key={d}
-                    onClick={()=>setTaskModal({project:row.projId,series:row.series,day:d})}
-                    onDragOver={e=>{e.preventDefault();
-                      e.dataTransfer.dropEffect=dragRef.current?.copy?"copy":"move";}}
-                    onDrop={e=>handleDrop(e,row,d)}
-                    style={{width:COL,flexShrink:0,borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
-                      padding:2,display:"flex",flexDirection:"column",gap:1,cursor:"pointer",
-                      background:isToday?"rgba(59,130,246,0.06)":"transparent",
-                      transition:"background 0.1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background=isToday?"rgba(59,130,246,0.12)":"rgba(255,255,255,0.03)"}
-                    onMouseLeave={e=>e.currentTarget.style.background=isToday?"rgba(59,130,246,0.06)":"transparent"}>
-                    {cellTasks.map(t=>{
-                      const st=stageMap[t.status];
-                      return (
-                        <div key={t.id}
-                          draggable
-                          onDragStart={e=>{
-                            e.stopPropagation();
-                            dragRef.current={task:t,copy:e.altKey};
-                            e.dataTransfer.effectAllowed=e.altKey?"copy":"move";
-                          }}
-                          onClick={e=>{e.stopPropagation();setTaskModal(t);}}
-                          title={`${t.person} ${t.from}:00–${t.to}:00 ${t.note||""}\n[Alt+перетащить = копировать]`}
-                          style={{background:st?colorToBg(st.color):"rgba(255,255,255,0.08)",
-                            border:`1px solid ${st?st.color+"44":"#334155"}`,
-                            borderRadius:3,padding:"1px 3px",fontSize:9,
-                            color:st?st.color:"#94a3b8",overflow:"hidden",
-                            whiteSpace:"nowrap",textOverflow:"ellipsis",
-                            cursor:"grab",userSelect:"none"}}>
-                          {t.unplanned&&"⚠"}{st?.label||t.status} {t.person}
-                        </div>
-                      );
-                    })}
+            return (
+              <React.Fragment key={proj.id}>
+                {/* Заголовок проекта */}
+                <div
+                  draggable
+                  onDragStart={e=>handleProjDragStart(e,proj.id)}
+                  onDragOver={e=>{if(projDragRef.current&&projDragRef.current!==proj.id)e.preventDefault();}}
+                  onDrop={e=>handleProjDrop(e,proj.id)}
+                  onClick={()=>toggleCollapse(proj.id)}
+                  style={{display:"flex",height:isCollapsed?26:36,background:"#05101f",
+                    cursor:"pointer",borderBottom:"1px solid #334155",userSelect:"none"}}>
+                  <div style={{width:200,flexShrink:0,position:"sticky",left:0,zIndex:10,
+                    display:"flex",alignItems:"center",padding:"0 10px",gap:6,
+                    borderRight:"1px solid #475569",background:"#05101f"}}>
+                    <span style={{fontSize:14,color:"#334155",cursor:"grab",flexShrink:0,lineHeight:1}}
+                      onMouseDown={e=>e.stopPropagation()}>⠿</span>
+                    <div style={{width:9,height:9,borderRadius:2,background:proj.color,flexShrink:0}}/>
+                    <span style={{fontWeight:700,fontSize:isCollapsed?11:12,color:"#94a3b8",flex:1,
+                      overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
+                      {proj.abbr||proj.name}
+                    </span>
+                    {isCollapsed&&<span style={{fontSize:9,color:"#475569",flexShrink:0,marginRight:2}}>
+                      {allSeries.length} сер.
+                    </span>}
+                    <span style={{fontSize:9,color:"#475569",flexShrink:0}}>{isCollapsed?"▶":"▼"}</span>
                   </div>
-                );
-              })}
-            </div>
-            {isExpanded&&subPeople.map((person,pi)=>(
-              <div key={person} style={{display:"flex",height:36,background:"rgba(59,130,246,0.04)",
-                borderBottom:"1px solid #0f172a"}}>
-                <div style={{width:200,flexShrink:0,position:"sticky",left:0,zIndex:5,
-                  display:"flex",alignItems:"center",padding:"0 10px 0 28px",
-                  borderRight:"1px solid #334155",background:"rgba(15,23,42,0.95)"}}>
-                  <div style={{width:4,height:4,borderRadius:"50%",background:"#3b82f6",marginRight:6,flexShrink:0}}/>
-                  <span style={{fontSize:11,color:"#94a3b8",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
-                    {person}
-                  </span>
+                  {days.map(d=>{
+                    const pd=parseDate(d); const isMon=pd?.getDay()===1;
+                    const isToday=d===todayStr;
+                    return (
+                      <div key={d} style={{width:COL,flexShrink:0,
+                        borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
+                        background:isToday?"rgba(59,130,246,0.04)":"transparent"}}/>
+                    );
+                  })}
                 </div>
-                {days.map(d=>{
-                  const pt=seriesTasks.filter(t=>t.person===person&&t.day===d);
-                  const isToday=d===todayStr;
+
+                {/* Серии */}
+                {!isCollapsed&&allSeries.map((ser,si)=>{
+                  const serKey=`${proj.id}|${ser.name}`;
+                  const isExpanded=expandedSeries.has(serKey);
+                  const rowH=isExpanded?90:52;
+                  const seriesTasks=data.tasks.filter(t=>t.project===proj.id&&t.series===ser.name);
+
                   return (
-                    <div key={d} style={{width:COL,flexShrink:0,padding:1,
-                      borderLeft:"1px solid #1e293b",
-                      background:isToday?"rgba(59,130,246,0.06)":"transparent",
-                      display:"flex",flexDirection:"column",gap:1}}>
-                      {pt.map(t=>{
-                        const st=stageMap[t.status];
+                    <div key={serKey} style={{display:"flex",height:rowH,
+                      background:si%2===0?"#0a1220":"#060d1a",
+                      borderBottom:"1px solid #1e293b"}}>
+                      {/* Метка серии */}
+                      <div
+                        onClick={()=>toggleExpandSer(serKey)}
+                        style={{width:200,flexShrink:0,position:"sticky",left:0,zIndex:5,
+                          display:"flex",alignItems:"center",padding:"0 8px 0 22px",
+                          borderRight:"1px solid #334155",cursor:"pointer",
+                          background:si%2===0?"#0f172a":"#0a1220"}}>
+                        <div style={{width:3,height:22,borderRadius:2,background:proj.color,
+                          marginRight:8,flexShrink:0,opacity:0.55}}/>
+                        <div style={{flex:1,overflow:"hidden"}}>
+                          <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",
+                            display:"flex",alignItems:"center",gap:4}}>
+                            {ser.name}
+                            <span style={{fontSize:8,color:isExpanded?"#3b82f6":"#334155"}}>
+                              {isExpanded?"▲":"▼"}
+                            </span>
+                          </div>
+                          {isExpanded&&<div style={{fontSize:9,color:"#475569",marginTop:1}}>
+                            {seriesTasks.length} задач · клик для свёртки
+                          </div>}
+                        </div>
+                      </div>
+
+                      {/* Ячейки дней */}
+                      {days.map(d=>{
+                        const cellTasks=seriesTasks.filter(t=>t.day===d);
+                        const isToday=d===todayStr;
+                        const pd=parseDate(d); const isMon=pd?.getDay()===1;
                         return (
-                          <div key={t.id} onClick={e=>{e.stopPropagation();setTaskModal(t);}}
-                            style={{background:st?colorToBg(st.color):"rgba(255,255,255,0.08)",
-                              border:`1px solid ${st?st.color+"44":"#334155"}`,
-                              borderRadius:3,padding:"1px 3px",fontSize:8,
-                              color:st?st.color:"#94a3b8",overflow:"hidden",
-                              whiteSpace:"nowrap",textOverflow:"ellipsis",cursor:"pointer"}}>
-                            {st?.abbr||st?.label||t.status} {t.from}–{t.to}
+                          <div key={d}
+                            onClick={()=>setTaskModal({project:proj.id,series:ser.name,day:d})}
+                            onDragOver={e=>{e.preventDefault();
+                              e.dataTransfer.dropEffect=dragRef.current?.copy?"copy":"move";}}
+                            onDrop={e=>handleDrop(e,{projId:proj.id,series:ser.name},d)}
+                            style={{width:COL,flexShrink:0,
+                              borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
+                              padding:2,display:"flex",flexDirection:"column",gap:1,
+                              cursor:"pointer",overflow:"hidden",
+                              background:isToday?"rgba(59,130,246,0.06)":"transparent",
+                              transition:"background 0.1s"}}
+                            onMouseEnter={e=>{if(!dragRef.current)
+                              e.currentTarget.style.background=isToday?"rgba(59,130,246,0.12)":"rgba(255,255,255,0.03)";}}
+                            onMouseLeave={e=>e.currentTarget.style.background=
+                              isToday?"rgba(59,130,246,0.06)":"transparent"}>
+                            {cellTasks.map(t=>{
+                              const st=stageMap[t.status];
+                              return (
+                                <div key={t.id}
+                                  draggable
+                                  onDragStart={e=>{
+                                    e.stopPropagation();
+                                    dragRef.current={task:t,copy:e.altKey};
+                                    e.dataTransfer.effectAllowed=e.altKey?"copy":"move";
+                                  }}
+                                  onDragEnd={()=>{dragRef.current=null;}}
+                                  onClick={e=>{e.stopPropagation();setTaskModal(t);}}
+                                  onMouseEnter={e=>{
+                                    e.stopPropagation();
+                                    setHoverTask({task:t,rect:e.currentTarget.getBoundingClientRect()});
+                                  }}
+                                  onMouseLeave={e=>{e.stopPropagation();setHoverTask(null);}}
+                                  style={{background:st?colorToBg(st.color):"rgba(255,255,255,0.08)",
+                                    border:`1px solid ${st?st.color+"44":"#334155"}`,
+                                    borderRadius:3,flexShrink:0,overflow:"hidden",
+                                    color:st?st.color:"#94a3b8",cursor:"grab",userSelect:"none",
+                                    padding:isExpanded?"3px 5px":"1px 3px"}}>
+                                  {isExpanded?(
+                                    <div style={{fontSize:9,lineHeight:1.4}}>
+                                      <div style={{fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                        {st?.abbr||st?.label||t.status}
+                                      </div>
+                                      <div style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",opacity:0.85}}>
+                                        {t.person||"—"}
+                                      </div>
+                                      <div style={{fontSize:8,opacity:0.6}}>
+                                        {t.from}–{t.to}
+                                      </div>
+                                    </div>
+                                  ):(
+                                    <div style={{fontSize:9,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                      {st?.abbr||st?.label||t.status} {t.person}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
                     </div>
                   );
                 })}
-              </div>
-            ))}
-            </React.Fragment>
-          );})}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
+
+      {hoverTask&&<GanttTooltip task={hoverTask.task} rect={hoverTask.rect} stageMap={stageMap}/>}
 
       {taskModal!==null&&(
         <TaskModal task={taskModal} data={data}
@@ -2143,8 +2225,27 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
     return data.tasks.some(t=>t.project===task.project&&t.series===task.series&&t.day>task.day&&t.id!==task.id);
   },[form.day,task,data.tasks]);
 
+  function handleSave(){
+    if(isLocked) return;
+    if(!form.project){alert("Выберите проект");return;}
+    if(!form.series){alert("Укажите серию");return;}
+    if(!form.status){alert("Выберите этап");return;}
+    if(!form.day){alert("Укажите дату");return;}
+    const ser=(data.series||[]).find(s=>s.projectId===form.project&&s.name===form.series);
+    const seriesId=ser?ser.id:(task.seriesId||null);
+    const saved={...task,...form,seriesId,autogenerated:task.autogenerated||false};
+    if(form.shifts_tail&&task.id&&form.day!==task.day){
+      const diff=(parseDate(form.day)-parseDate(task.day))/(1000*60*60*24);
+      const tailTasks=data.tasks.filter(t=>t.project===task.project&&t.series===task.series&&t.day>task.day&&t.id!==task.id);
+      const updatedTail=tailTasks.map(t=>({...t,day:addDays(t.day,diff)}));
+      const allTasks=data.tasks.map(t=>{const upd=updatedTail.find(u=>u.id===t.id);return upd||t;});
+      onSave({...saved,_cascadeAll:allTasks});
+    } else {
+      onSave(saved);
+    }
+  }
   return (
-    <Modal title={isNew?"Новая задача":"Редактировать задачу"} onClose={onClose} locked>
+    <Modal title={isNew?"Новая задача":"Редактировать задачу"} onClose={onClose} onSubmit={handleSave}>
       {isLocked&&(
         <div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.35)",
           borderRadius:6,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#f87171",
@@ -2212,28 +2313,7 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
         <div>{!isNew&&<Btn variant="danger" disabled={isLocked} onClick={()=>!isLocked&&onDelete(task.id)}>Удалить</Btn>}</div>
         <div style={{display:"flex",gap:8}}>
           <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
-          <Btn variant="primary" disabled={isLocked} onClick={()=>{
-            if(isLocked) return;
-            if(!form.project){alert("Выберите проект");return;}
-            if(!form.series){alert("Укажите серию");return;}
-            if(!form.status){alert("Выберите этап");return;}
-            if(!form.day){alert("Укажите дату");return;}
-            const ser=(data.series||[]).find(s=>s.projectId===form.project&&s.name===form.series);
-            const seriesId=ser?ser.id:(task.seriesId||null);
-            const saved={...task,...form,seriesId,autogenerated:task.autogenerated||false};
-            if(form.shifts_tail&&task.id&&form.day!==task.day){
-              const diff=(parseDate(form.day)-parseDate(task.day))/(1000*60*60*24);
-              const tailTasks=data.tasks.filter(t=>t.project===task.project&&t.series===task.series&&t.day>task.day&&t.id!==task.id);
-              const updatedTail=tailTasks.map(t=>({...t,day:addDays(t.day,diff)}));
-              const allTasks=data.tasks.map(t=>{
-                const upd=updatedTail.find(u=>u.id===t.id);
-                return upd||t;
-              });
-              onSave({...saved,_cascadeAll:allTasks});
-            } else {
-              onSave(saved);
-            }
-          }}>
+          <Btn variant="primary" disabled={isLocked} onClick={handleSave}>
             {isNew?"Создать задачу":"Сохранить"}
           </Btn>
         </div>
@@ -2507,7 +2587,7 @@ function ConflictsView({details,data}){
   const in7Str=formatDate(in7);
 
   const unfilledTasks=useMemo(()=>
-    data.tasks.filter(t=>!t.person&&t.day>=todayStr&&t.day<=in7Str&&t.status!=="съёмки")
+    data.tasks.filter(t=>!t.person&&daySort(t.day)>=daySort(todayStr)&&daySort(t.day)<=daySort(in7Str)&&t.status!=="съёмки")
       .sort((a,b)=>daySort(a.day).localeCompare(daySort(b.day))||a.status.localeCompare(b.status)),
   [data.tasks,todayStr,in7Str]);
 
@@ -2541,7 +2621,7 @@ function ConflictsView({details,data}){
               const isToday=t.day===todayStr;
               const tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);
               const tomorrowStr=formatDate(tomorrow);
-              const isUrgent=t.day<=tomorrowStr;
+              const isUrgent=daySort(t.day)<=daySort(tomorrowStr);
               return (
                 <div key={t.id} style={{background:"#1e293b",
                   border:`1px solid ${isUrgent?"rgba(249,115,22,0.4)":"#334155"}`,
@@ -2575,7 +2655,7 @@ function ConflictsView({details,data}){
           <span style={{color:"#64748b",fontSize:12}}>один человек — несколько задач в пересекающееся время</span>
         </div>
       </div>
-      {Object.entries(byDay).sort(([a],[b])=>a.localeCompare(b)).map(([day,pairs])=>(
+      {Object.entries(byDay).sort(([a],[b])=>daySort(a).localeCompare(daySort(b))).map(([day,pairs])=>(
         <div key={day} style={{marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
             <span style={{fontSize:12,fontWeight:700,color:"#f87171"}}>{dayLabel(day)}</span>
@@ -3082,8 +3162,8 @@ function App(){
 
   const {ids:conflictIds,details:conflictDetails}=useMemo(()=>{
     if(!data) return {ids:new Set(),details:[]};
-    const todayStr=formatDate(new Date());
-    return getConflicts(data.tasks.filter(t=>t.day>=todayStr));
+    const todayStr=daySort(formatDate(new Date()));
+    return getConflicts(data.tasks.filter(t=>daySort(t.day)>=todayStr));
   },[data?.tasks]);
   const conflictCount=conflictDetails.length;
 
@@ -3148,7 +3228,7 @@ function App(){
         {view==="people"   &&<PeopleView    data={data} conflictIds={conflictIds}/>}
         {view==="conflicts" &&<ConflictsView details={conflictDetails} data={data}/>}
         {view==="analytics" &&<AnalyticsView data={data}/>}
-        {view==="directory" &&<DirectoryView data={data} onUpdate={updateData}/>}
+        {view==="directory" &&<DirectoryView data={data} onUpdate={updateData} onBatchUpdate={batchUpdate}/>}
 
         {!["conflicts","analytics","directory"].includes(view)&&(
           <div style={{marginTop:24,paddingTop:14,borderTop:"1px solid #1e293b",
