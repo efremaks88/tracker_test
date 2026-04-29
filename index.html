@@ -3646,24 +3646,11 @@ function SeriesCard({seriesId,data,onBatchUpdate}){
                 <div><label style={lSt}>ЭФИР</label>
                   <InpDate value={ser.airDate||""} onChange={v=>upSer({airDate:v})}/></div>
               </div>
-              <div style={{fontSize:10,color:"#475569",letterSpacing:1}}>——— ТРАНЗИТКИ ———</div>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:1}}>——— ТРАНЗИТНЫЙ КОД ———</div>
               <div>
                 <label style={lSt}>ТРАНЗИТНЫЙ КОД</label>
                 <input defaultValue={ser.transitCode||""} style={iSt}
                   onBlur={e=>{if(e.target.value!==(ser.transitCode||""))upSer({transitCode:e.target.value});}}/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {[0,1,2].map(vi=>(
-                  <div key={vi}>
-                    <label style={lSt}>ВАРИАНТ {vi+1}</label>
-                    <input defaultValue={(ser.transitVariants||["","",""])[vi]||""} style={iSt}
-                      onBlur={e=>{
-                        const v=e.target.value;
-                        const cur=ser.transitVariants||["","",""];
-                        if(v!==cur[vi]){const nv=[...cur];nv[vi]=v;upSer({transitVariants:nv});}
-                      }}/>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
@@ -3929,8 +3916,9 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
   const TABS=[
     {id:"general",label:"Общее"},
     {id:"series",label:`Серии (${projSeries.length})`},
+    {id:"kpp",label:"КПП"},
     {id:"info",label:"Информация"},
-    {id:"transits",label:"Транзитки"},
+    {id:"transits",label:"Транзиты"},
     {id:"access",label:"Доступы и ссылки"},
     {id:"notes",label:"Заметки"},
   ];
@@ -4090,6 +4078,92 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
         </div>
       )}
 
+      {tab==="kpp"&&(
+        <div style={{background:"#1e293b",borderRadius:10,border:"1px solid #334155",overflowX:"auto"}}>
+          {projSeries.length===0?(
+            <div style={{padding:24,color:"#475569",fontSize:14}}>Нет серий</div>
+          ):(
+            <table style={{borderCollapse:"collapse"}}>
+              <thead>
+                <tr>
+                  <th style={{padding:"7px 14px",fontSize:11,color:"#64748b",letterSpacing:1,
+                    textAlign:"left",borderBottom:"2px solid #334155",borderRight:"2px solid #334155",
+                    position:"sticky",left:0,background:"#1e293b",zIndex:3,
+                    whiteSpace:"nowrap",minWidth:150}}>
+                    ЭТАП
+                  </th>
+                  {projSeries.map(ser=>(
+                    <th key={ser.id} style={{padding:"7px 10px",fontSize:12,fontWeight:700,
+                      textAlign:"center",borderBottom:"2px solid #334155",
+                      borderLeft:"1px solid #334155",minWidth:112,whiteSpace:"nowrap",
+                      color:ser.delivered?"#22c55e":"#e2e8f0"}}>
+                      {ser.name}{ser.delivered?" ✓":""}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...stageGroups].reverse().map(g=>{
+                  const stg=stages.find(s=>s.groupId===g.id);
+                  const c=stg?.color||"#475569";
+                  return (
+                    <React.Fragment key={g.id}>
+                      {["from","to"].map((field,fi)=>(
+                        <tr key={field}>
+                          <td style={{padding:"3px 12px",
+                            position:"sticky",left:0,zIndex:2,
+                            background:"#1e293b",
+                            borderLeft:`3px solid ${fi===0?c:c+"44"}`,
+                            borderRight:"2px solid #334155",
+                            borderBottom:fi===1?"1px solid #334155":"none",
+                            whiteSpace:"nowrap"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <span style={{fontSize:11,
+                                fontWeight:fi===0?700:400,
+                                color:fi===0?c:"#334155"}}>
+                                {fi===0?g.label:""}
+                              </span>
+                              <span style={{fontSize:10,fontWeight:700,flexShrink:0,
+                                color:fi===0?"#94a3b8":"#475569",
+                                background:"#0f172a",borderRadius:3,padding:"1px 5px"}}>
+                                {fi===0?"С":"ПО"}
+                              </span>
+                            </div>
+                          </td>
+                          {projSeries.map(ser=>{
+                            const r=(ser.stageRanges||{})[g.id]||{};
+                            const val=r[field]||"";
+                            function setVal(v){
+                              const old=ser.stageRanges||{};
+                              const nr={...old,[g.id]:{...(old[g.id]||{}),[field]:v}};
+                              onBatchUpdate({series:(data.series||[]).map(s=>s.id===ser.id?{...s,stageRanges:nr}:s),tasks:data.tasks});
+                            }
+                            return (
+                              <td key={ser.id} style={{padding:"1px 3px",
+                                borderLeft:"1px solid #0f172a",
+                                borderBottom:fi===1?"1px solid #1e293b":"none",
+                                background:val?`${c}0d`:"transparent"}}>
+                                <input type="date"
+                                  value={toInput(val)}
+                                  onChange={e=>setVal(fromInput(e.target.value))}
+                                  style={{background:"transparent",border:"none",
+                                    color:val?"#e2e8f0":"#1e293b",fontSize:11,
+                                    outline:"none",width:108,cursor:"pointer",
+                                    fontFamily:"inherit"}}/>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {tab==="info"&&(
         <div style={{background:"#1e293b",borderRadius:10,padding:20,border:"1px solid #334155"}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -4126,40 +4200,25 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
           {projSeries.length===0?
             <div style={{color:"#475569",fontSize:14}}>Нет серий</div>
           :(
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:320}}>
               <thead>
                 <tr>
-                  {["Серия","Транзитный код","Вариант 1","Вариант 2","Вариант 3"].map((h,i)=>(
+                  {["Серия","Транзитный код"].map((h,i)=>(
                     <th key={i} style={{textAlign:"left",padding:"6px 10px",fontSize:11,
                       color:"#64748b",letterSpacing:1,borderBottom:"1px solid #334155",whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {projSeries.map(ser=>{
-                  const variants=ser.transitVariants||["","",""];
-                  return (
-                    <tr key={ser.id} style={{borderBottom:"1px solid #1e293b"}}>
-                      <td style={{padding:"6px 10px",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>{ser.name}</td>
-                      <td style={{padding:"4px 6px",minWidth:140}}>
-                        <input defaultValue={ser.transitCode||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
-                          onBlur={e=>{if(e.target.value!==(ser.transitCode||""))upSer(ser.id,{transitCode:e.target.value});}}/>
-                      </td>
-                      {[0,1,2].map(vi=>(
-                        <td key={vi} style={{padding:"4px 6px",minWidth:120}}>
-                          <input defaultValue={variants[vi]||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
-                            onBlur={e=>{
-                              const v=e.target.value;
-                              if(v!==(variants[vi]||"")){
-                                const nv=[...variants];nv[vi]=v;
-                                upSer(ser.id,{transitVariants:nv});
-                              }
-                            }}/>
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
+                {projSeries.map(ser=>(
+                  <tr key={ser.id} style={{borderBottom:"1px solid #1e293b"}}>
+                    <td style={{padding:"6px 10px",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>{ser.name}</td>
+                    <td style={{padding:"4px 6px",minWidth:200}}>
+                      <input defaultValue={ser.transitCode||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
+                        onBlur={e=>{if(e.target.value!==(ser.transitCode||""))upSer(ser.id,{transitCode:e.target.value});}}/>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -4287,9 +4346,12 @@ function App(){
           });
           migrated=true;
         }
-        if((record.series||[]).some(s=>!s.checklists)){
-          record.series=(record.series||[]).map(s=>s.checklists?s:
-            {...s,checklists:[],notes:s.notes||"",delivered:s.delivered||false,deliveredAt:s.deliveredAt||""});
+        if((record.series||[]).some(s=>!s.checklists||s.stageRanges===undefined)){
+          record.series=(record.series||[]).map(s=>({
+            checklists:[],notes:"",delivered:false,deliveredAt:"",
+            stageRanges:{},
+            ...s,
+          }));
           migrated=true;
         }
         if((record.projects||[]).some(p=>!p.dossier)){
