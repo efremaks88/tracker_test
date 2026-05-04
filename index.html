@@ -48,17 +48,48 @@ const HolidaysCtx = React.createContext([]);
 
 // ── КОНСТАНТЫ ────────────────────────────────────────────────────────
 const DEFAULT_STAGES = [
-  {id:"инжест",    label:"Инжест",          color:"#94a3b8",order:1, groupId:"sg1",rolesRequired:["инжест"],               needsExecutor:true},
-  {id:"синхра",    label:"Синхра",          color:"#ec4899",order:2, groupId:"sg2",rolesRequired:["инжест","монтаж"],      needsExecutor:true},
-  {id:"редактура", label:"Редактура",       color:"#a78bfa",order:3, groupId:"sg3",rolesRequired:["монтаж"],               needsExecutor:true},
-  {id:"монтаж",    label:"Монтаж",          color:"#6366f1",order:4, groupId:"sg4",rolesRequired:["монтаж"],               needsExecutor:true},
-  {id:"цвет/звук", label:"Цвет/Звук",      color:"#f59e0b",order:5, groupId:"sg4",rolesRequired:["цвет","звук"],          needsExecutor:true},
-  {id:"предотк",   label:"Пред-ОТК",       color:"#3b82f6",order:6, groupId:"sg5",rolesRequired:["выпуск","продюсер"],    needsExecutor:true},
-  {id:"отсмотр",   label:"Отсмотр",        color:"#8b5cf6",order:7, groupId:"sg6",rolesRequired:["выпуск","продюсер"],    needsExecutor:true},
-  {id:"правки",    label:"Правки",          color:"#f97316",order:8, groupId:"sg4",rolesRequired:["монтаж","цвет","звук"], needsExecutor:true},
-  {id:"мастеринг", label:"Мастеринг",      color:"#14b8a6",order:9, groupId:"sg7",rolesRequired:["цвет","звук"],          needsExecutor:true},
-  {id:"просмотр",  label:"Просмотр канала",color:"#64748b",order:10,groupId:"sg8",rolesRequired:["выпуск","продюсер"],    needsExecutor:false},
-  {id:"сдача",     label:"Сдача ОТК",      color:"#22c55e",order:11,groupId:"sg8",rolesRequired:["выпуск","продюсер"],    needsExecutor:true},
+  // Съемка
+  {id:"съемки",            label:"Съемки",                   color:"#f97316",order:1,  groupId:"sg1", rolesRequired:[],                   needsExecutor:false},
+  // Синхра
+  {id:"приход_мат",        label:"Приход материала",         color:"#ec4899",order:2,  groupId:"sg2", rolesRequired:["инжест"],            needsExecutor:true},
+  {id:"синхра",            label:"Синхра",                   color:"#ec4899",order:3,  groupId:"sg2", rolesRequired:["инжест","монтаж"],   needsExecutor:true},
+  // Редактура
+  {id:"редактура",         label:"Редактура",                color:"#a78bfa",order:4,  groupId:"sg3", rolesRequired:["монтаж"],            needsExecutor:true},
+  {id:"рыба",              label:"Получение рыбы",           color:"#a78bfa",order:5,  groupId:"sg3", rolesRequired:["выпуск"],            needsExecutor:true},
+  // Монтаж
+  {id:"монтаж",            label:"Монтаж",                   color:"#6366f1",order:6,  groupId:"sg4", rolesRequired:["монтаж"],            needsExecutor:true},
+  {id:"отсмотр_вып",       label:"Отсмотр выпускающего",     color:"#6366f1",order:7,  groupId:"sg4", rolesRequired:["выпуск"],            needsExecutor:true},
+  // Внутренний отсмотр
+  {id:"внутр_отсмотр",     label:"Внутренний отсмотр",       color:"#3b82f6",order:8,  groupId:"sg5", rolesRequired:["выпуск","продюсер"], needsExecutor:true},
+  {id:"просмотр_заказ",    label:"Просмотр заказчиков",      color:"#3b82f6",order:9,  groupId:"sg5", rolesRequired:["продюсер"],          needsExecutor:true},
+  // Отсмотр на канале
+  {id:"отсмотр_канал",     label:"Отсмотр на канале",        color:"#8b5cf6",order:10, groupId:"sg6", rolesRequired:["выпуск"],            needsExecutor:true},
+  // Мастеринг
+  {id:"правки_предотк",    label:"Правки предОТК",           color:"#0ea5e9",order:11, groupId:"sg7", rolesRequired:["монтаж","цвет","звук"],needsExecutor:true},
+  {id:"высчет",            label:"Высчет на цвет/звук",      color:"#0ea5e9",order:12, groupId:"sg7", rolesRequired:["цвет","звук"],       needsExecutor:true},
+  {id:"цветокор",          label:"Цветокор",                 color:"#f59e0b",order:13, groupId:"sg7", rolesRequired:["цвет"],              needsExecutor:true},
+  {id:"сведение_звука",    label:"Сведение звука",           color:"#14b8a6",order:14, groupId:"sg7", rolesRequired:["звук"],              needsExecutor:true},
+  {id:"отсмотр_маст",      label:"Отсмотр мастеринга",       color:"#0ea5e9",order:15, groupId:"sg7", rolesRequired:["выпуск"],            needsExecutor:true},
+  {id:"правки_маст",       label:"Правки на цвет/звук",      color:"#0ea5e9",order:16, groupId:"sg7", rolesRequired:["цвет","звук"],       needsExecutor:true},
+  {id:"отсмотр_маст_прод", label:"Отсмотр мастеринга прод.", color:"#0ea5e9",order:17, groupId:"sg7", rolesRequired:["продюсер"],          needsExecutor:true},
+  // ОТК
+  {id:"выгон_отк",         label:"Выгон на ОТК",             color:"#22c55e",order:18, groupId:"sg8", rolesRequired:["выпуск"],            needsExecutor:true},
+  {id:"правки_отк",        label:"Правки ОТК",               color:"#22c55e",order:19, groupId:"sg8", rolesRequired:["монтаж","цвет","звук"],needsExecutor:true},
+  {id:"выгон_заплаток",    label:"Выгон заплаток",           color:"#22c55e",order:20, groupId:"sg8", rolesRequired:["выпуск"],            needsExecutor:true},
+  {id:"сдача_отк",         label:"Сдача ОТК",                color:"#22c55e",order:21, groupId:"sg8", rolesRequired:["выпуск","продюсер"], needsExecutor:true},
+  // БезРЕК
+  {id:"безрек",            label:"БезРЕК",                   color:"#f59e0b",order:22, groupId:"sg9", rolesRequired:["монтаж"],            needsExecutor:true},
+  // Архив
+  {id:"выгон_развед",      label:"Выгон разведенки",         color:"#64748b",order:23, groupId:"sg10",rolesRequired:["инжест"],            needsExecutor:true},
+  {id:"подготовка_архива", label:"Подготовка архива",        color:"#64748b",order:24, groupId:"sg10",rolesRequired:["инжест"],            needsExecutor:true},
+  // Без группы
+  {id:"графика",           label:"Графика",                  color:"#06b6d4",order:25, groupId:"",    rolesRequired:[],                   needsExecutor:true},
+  {id:"промо",             label:"Промо",                    color:"#f43f5e",order:26, groupId:"",    rolesRequired:[],                   needsExecutor:false},
+  {id:"блюр",              label:"Блюр",                     color:"#94a3b8",order:27, groupId:"",    rolesRequired:[],                   needsExecutor:false},
+  {id:"титры",             label:"Титры",                    color:"#94a3b8",order:28, groupId:"",    rolesRequired:[],                   needsExecutor:false},
+  {id:"правки",            label:"Правки",                   color:"#f97316",order:29, groupId:"",    rolesRequired:[],                   needsExecutor:false},
+  {id:"заплатки_цвет",     label:"Заплатки цвет",            color:"#f59e0b",order:30, groupId:"",    rolesRequired:["цвет"],             needsExecutor:true},
+  {id:"заплатки_звук",     label:"Заплатки звук",            color:"#14b8a6",order:31, groupId:"",    rolesRequired:["звук"],             needsExecutor:true},
 ];
 
 const DEFAULT_HOLIDAYS = [
@@ -71,22 +102,29 @@ const DEFAULT_HOLIDAYS = [
 ];
 
 const PALETTE = ["#3b82f6","#a855f7","#22c55e","#f59e0b","#ec4899","#ef4444","#14b8a6","#f97316","#06b6d4","#84cc16"];
+const GANTT_TEMPLATES=[
+  {status:"синхра",        label:"Синхра"},
+  {status:"монтаж",        label:"Монтаж"},
+  {status:"цветокор",      label:"Цвет"},
+  {status:"сведение_звука",label:"Звук"},
+  {status:"графика",       label:"Графика"},
+];
 const TIME_PRESETS = [{f:10,t:19},{f:11,t:20},{f:10,t:14},{f:14,t:19},{f:10,t:22},{f:9,t:18}];
 const WDAYS = ["вс","пн","вт","ср","чт","пт","сб"];
 const WDAYS_LONG = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const PROJECT_STATUSES = ["в работе","ожидаем","на паузе","сдан","архив"];
 const DEFAULT_STAGE_GROUPS = [
-  {id:"sg1", label:"Съёмки",          order:1},
-  {id:"sg2", label:"Синхра",           order:2},
-  {id:"sg3", label:"Редактура",        order:3},
-  {id:"sg4", label:"Монтаж",           order:4},
-  {id:"sg5", label:"Внутр. отсмотр",  order:5},
-  {id:"sg6", label:"Отсмотр канала",   order:6},
-  {id:"sg7", label:"Мастеринг",        order:7},
-  {id:"sg8", label:"ОТК",              order:8},
-  {id:"sg9", label:"БезРЕК",           order:9},
-  {id:"sg10",label:"Архив",            order:10},
+  {id:"sg1", label:"Съемка",              order:1},
+  {id:"sg2", label:"Синхра",              order:2},
+  {id:"sg3", label:"Редактура",           order:3},
+  {id:"sg4", label:"Монтаж",              order:4},
+  {id:"sg5", label:"Внутренний отсмотр",  order:5},
+  {id:"sg6", label:"Отсмотр на канале",   order:6},
+  {id:"sg7", label:"Мастеринг",           order:7},
+  {id:"sg8", label:"ОТК",                 order:8},
+  {id:"sg9", label:"БезРЕК",              order:9},
+  {id:"sg10",label:"Архив",               order:10},
 ];
 function daySort(s){return s?s.split('.').reverse().join(''):'';}
 
@@ -493,13 +531,15 @@ function generateAutoTasks(series,existingTasks){
   const base={project:series.projectId,series:series.name,seriesId:series.id,
     person:"",from:10,to:19,note:"",unplanned:false,shifts_tail:false,autogenerated:true};
   if(series.shootStart)
-    auto.push({...base,id:nid++,status:"съёмки",day:series.shootStart});
+    for(let i=0;i<3;i++) auto.push({...base,id:nid++,status:"съемки",day:addDays(series.shootStart,i)});
+  if(series.syncStart)
+    for(let i=0;i<2;i++) auto.push({...base,id:nid++,status:"синхра",day:addDays(series.syncStart,i)});
   if(series.editStart)
     for(let i=0;i<5;i++) auto.push({...base,id:nid++,status:"монтаж",day:addDays(series.editStart,i)});
   if(series.preOtkDate)
-    auto.push({...base,id:nid++,status:"предотк",day:series.preOtkDate});
+    auto.push({...base,id:nid++,status:"правки_предотк",day:series.preOtkDate});
   if(series.otkDate)
-    auto.push({...base,id:nid++,status:"сдача",day:series.otkDate});
+    auto.push({...base,id:nid++,status:"сдача_отк",day:series.otkDate});
   return [...manual,...auto];
 }
 function filterPeopleByStatus(people, status, stages){
@@ -773,14 +813,17 @@ function StatusBadge({s,small}){
   );
 }
 
-function TaskCard({task,projects,isConflict,onClick}){
+function TaskCard({task,projects,isConflict,onClick,onHover}){
   const color=projColor(projects,task.project);
   const pname=projAbbr(projects,task.project);
   return (
-    <div onClick={onClick} style={{borderLeft:`3px solid ${isConflict?"#ef4444":color}`,
-      background:isConflict?"rgba(239,68,68,0.07)":"rgba(255,255,255,0.03)",
-      borderRadius:"0 6px 6px 0",padding:"5px 8px",marginBottom:4,
-      cursor:onClick?"pointer":"default"}}>
+    <div onClick={onClick}
+      onMouseEnter={onHover?e=>onHover(task,e.currentTarget.getBoundingClientRect()):undefined}
+      onMouseLeave={onHover?()=>onHover(null):undefined}
+      style={{borderLeft:`3px solid ${isConflict?"#ef4444":color}`,
+        background:isConflict?"rgba(239,68,68,0.07)":"rgba(255,255,255,0.03)",
+        borderRadius:"0 6px 6px 0",padding:"5px 8px",marginBottom:4,
+        cursor:onClick?"pointer":"default"}}>
       <div style={{fontWeight:700,color:isConflict?"#f87171":color,fontSize:11,marginBottom:2}}>
         {isConflict&&"⚡ "}{task.series}
         {task.unplanned&&<span style={{color:"#f97316",marginLeft:4,fontSize:9}}>⚠внеплан</span>}
@@ -791,6 +834,39 @@ function TaskCard({task,projects,isConflict,onClick}){
         <StatusBadge s={task.status} small/>
         <span style={{color:"#475569",fontSize:10}}>{task.from}:00–{task.to}:00</span>
       </div>
+    </div>
+  );
+}
+function TaskTooltip({task,rect,projects}){
+  const {stageMap}=useContext(StagesCtx);
+  if(!task||!rect) return null;
+  const st=stageMap[task.status];
+  const color=projColor(projects,task.project);
+  const pname=projName(projects,task.project);
+  const W=240; const vw=window.innerWidth; const vh=window.innerHeight;
+  let left=rect.right+10; if(left+W>vw-16) left=rect.left-W-10;
+  let top=rect.top; if(top+180>vh-16) top=Math.max(8,vh-196);
+  return (
+    <div style={{position:"fixed",left,top,zIndex:9999,width:W,
+      background:"#1e293b",border:"1px solid #475569",borderRadius:8,
+      padding:"10px 14px",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,0.65)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+        <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
+        <span style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pname}</span>
+      </div>
+      {task.series&&<div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>{task.series}</div>}
+      {st&&<div style={{marginBottom:6}}>
+        <span style={{background:colorToBg(st.color),border:`1px solid ${st.color}55`,
+          borderRadius:4,padding:"2px 8px",fontSize:11,color:st.color,fontWeight:600}}>
+          {st.label}
+        </span>
+      </div>}
+      {task.person&&<div style={{fontSize:12,color:"#cbd5e1",marginBottom:3}}>{task.person}</div>}
+      <div style={{fontSize:11,color:"#64748b",marginBottom:task.note?4:0}}>
+        {task.from}:00 – {task.to}:00 · {(task.to||0)-(task.from||0)} ч
+        {task.unplanned&&<span style={{color:"#f97316",marginLeft:6}}>⚠ внеплан</span>}
+      </div>
+      {task.note&&<div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4,marginTop:4,borderTop:"1px solid #334155",paddingTop:4}}>{task.note}</div>}
     </div>
   );
 }
@@ -872,22 +948,23 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
   const [roleForm,setRoleForm]=useState({id:"",label:"",color:"#6366f1"});
   const [editRoleId,setEditRoleId]=useState(null);
   const [search,setSearch]=useState("");
+  const [dragOverStage,setDragOverStage]=useState(null);
+  const stageDragRef=useRef(null);
   const [newHoliday,setNewHoliday]=useState("");
 
   const stages=(data.stages&&data.stages.length)?[...data.stages].sort((a,b)=>(a.order||0)-(b.order||0)):DEFAULT_STAGES;
   const stageGroups=(data.stageGroups&&data.stageGroups.length)?[...data.stageGroups].sort((a,b)=>(a.order||0)-(b.order||0)):DEFAULT_STAGE_GROUPS;
   const holidays=data.holidays||DEFAULT_HOLIDAYS;
+  const roles=data.roles||DEMO_ROLES;
 
   function saveRole(role){
-    let roles=[...data.roles];
-    if(editRoleId) roles=roles.map(r=>r.id===editRoleId?{...r,...role}:r);
-    else roles.push(role);
-    onUpdate("roles",roles);
+    let newRoles=editRoleId?roles.map(r=>r.id===editRoleId?{...r,...role}:r):[...roles,role];
+    onUpdate("roles",newRoles);
     setEditRoleId(null); setRoleForm({id:"",label:"",color:"#6366f1"});
   }
   function deleteRole(id){
     if(!window.confirm(`Удалить роль "${id}"?`)) return;
-    const newRoles=data.roles.filter(r=>r.id!==id);
+    const newRoles=roles.filter(r=>r.id!==id);
     const newStages=stages.map(s=>({...s,rolesRequired:(s.rolesRequired||[]).filter(r=>r!==id)}));
     onBatchUpdate({roles:newRoles,stages:newStages});
   }
@@ -975,7 +1052,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,alignItems:"start"}}>
           <div>
             <div style={{fontSize:14,fontWeight:700,color:"#93c5fd",marginBottom:12}}>Справочник ролей</div>
-            {data.roles.map(role=>(
+            {roles.map(role=>(
               <div key={role.id} style={{background:"#1e293b",border:"1px solid #334155",
                 borderRadius:8,padding:"9px 12px",marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:10,height:10,borderRadius:2,background:role.color,flexShrink:0}}/>
@@ -1015,7 +1092,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
               </Field>
               <Btn variant="primary" onClick={()=>{
                 if(!roleForm.label||!roleForm.id){alert("Заполните ID и название");return;}
-                if(data.roles.find(r=>r.id===roleForm.id)){alert("Такой ID уже есть");return;}
+                if(roles.find(r=>r.id===roleForm.id)){alert("Такой ID уже есть");return;}
                 saveRole({id:roleForm.id,label:roleForm.label,color:roleForm.color});
               }}>+ Добавить роль</Btn>
             </div>
@@ -1029,30 +1106,47 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
             <span style={{fontSize:14,fontWeight:700,color:"#93c5fd"}}>Этапы производства ({stages.length})</span>
             <Btn variant="primary" onClick={addStage}>+ Добавить этап</Btn>
           </div>
-          {stages.map((stage,i)=>(
-            <div key={stage.id} style={{background:"#1e293b",border:"1px solid #334155",
-              borderRadius:8,padding:"9px 12px",marginBottom:6,
-              display:"flex",alignItems:"center",gap:8}}>
-              <div style={{display:"flex",flexDirection:"column",gap:1}}>
-                <button onClick={()=>moveStage(stage.id,-1)} disabled={i===0}
-                  style={{background:"none",border:"none",color:i===0?"#1e293b":"#64748b",
-                    cursor:i===0?"default":"pointer",fontSize:10,lineHeight:1,padding:"1px 3px"}}>▲</button>
-                <button onClick={()=>moveStage(stage.id,1)} disabled={i===stages.length-1}
-                  style={{background:"none",border:"none",
-                    color:i===stages.length-1?"#1e293b":"#64748b",
-                    cursor:i===stages.length-1?"default":"pointer",fontSize:10,lineHeight:1,padding:"1px 3px"}}>▼</button>
-              </div>
-              <span style={{fontSize:10,color:"#334155",width:16,textAlign:"right"}}>{i+1}</span>
+          {stages.map((stage,i)=>{
+            const isDragOver=dragOverStage===stage.id&&stageDragRef.current!==stage.id;
+            return (
+            <div key={stage.id}
+              draggable
+              onDragStart={()=>{stageDragRef.current=stage.id;}}
+              onDragOver={e=>{e.preventDefault();if(stageDragRef.current!==stage.id)setDragOverStage(stage.id);}}
+              onDragLeave={()=>setDragOverStage(null)}
+              onDrop={e=>{
+                e.preventDefault();
+                const fromId=stageDragRef.current;
+                if(!fromId||fromId===stage.id){setDragOverStage(null);return;}
+                const arr=[...stages];
+                const fi=arr.findIndex(s=>s.id===fromId);
+                const ti=arr.findIndex(s=>s.id===stage.id);
+                const [item]=arr.splice(fi,1);
+                arr.splice(ti,0,item);
+                onUpdate("stages",arr.map((s,idx)=>({...s,order:idx+1})));
+                setDragOverStage(null);stageDragRef.current=null;
+              }}
+              onDragEnd={()=>{setDragOverStage(null);stageDragRef.current=null;}}
+              style={{background:"#1e293b",
+                border:`1px solid ${isDragOver?"#3b82f6":"#334155"}`,
+                borderRadius:8,padding:"9px 12px",marginBottom:6,
+                display:"flex",alignItems:"center",gap:8,
+                cursor:"grab",userSelect:"none",
+                boxShadow:isDragOver?"0 0 0 2px #3b82f644":"none",
+                opacity:stageDragRef.current===stage.id?0.5:1,
+                transition:"border-color 0.1s,box-shadow 0.1s"}}>
+              <div style={{color:"#334155",fontSize:14,padding:"0 4px",cursor:"grab",flexShrink:0}}>⠿</div>
+              <span style={{fontSize:10,color:"#334155",width:16,textAlign:"right",flexShrink:0}}>{i+1}</span>
               <div style={{width:10,height:10,borderRadius:2,background:stage.color,flexShrink:0}}/>
               <div style={{flex:1}}>
                 <span style={{fontSize:13,fontWeight:600}}>{stage.label}</span>
                 {!stage.needsExecutor&&<span style={{fontSize:9,color:"#64748b",marginLeft:6}}>без исполнителя</span>}
                 {(()=>{
-                  const knownRoles=(stage.rolesRequired||[]).filter(rid=>data.roles.find(r=>r.id===rid));
-                  const missing=(stage.rolesRequired||[]).filter(rid=>!data.roles.find(r=>r.id===rid));
+                  const knownRoles=(stage.rolesRequired||[]).filter(rid=>roles.find(r=>r.id===rid));
+                  const missing=(stage.rolesRequired||[]).filter(rid=>!roles.find(r=>r.id===rid));
                   return (knownRoles.length>0||missing.length>0)&&(
                     <div style={{fontSize:10,color:"#475569",marginTop:1}}>
-                      Роли: {knownRoles.map(rid=>data.roles.find(r=>r.id===rid)?.label||rid).join(", ")}
+                      Роли: {knownRoles.map(rid=>roles.find(r=>r.id===rid)?.label||rid).join(", ")}
                       {missing.length>0&&<span style={{color:"#ef4444",marginLeft:4}}>
                         ⚠ удалены: {missing.join(", ")}
                       </span>}
@@ -1070,7 +1164,8 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
                 <Btn small variant="danger" onClick={()=>deleteStage(stage.id)}>✕</Btn>
               </div>
             </div>
-          ))}
+            );
+          })}
           <div style={{marginTop:12}}>
             <Btn variant="ghost" onClick={()=>onUpdate("stages",DEFAULT_STAGES)}>
               ↺ Сбросить к умолчаниям
@@ -1104,7 +1199,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
                   </div>
                   <div style={{display:"flex",gap:3,marginTop:3,flexWrap:"wrap"}}>
                     {(person.roles||[]).map(r=>{
-                      const role=data.roles.find(rl=>rl.id===r);
+                      const role=roles.find(rl=>rl.id===r);
                       return <span key={r} style={{fontSize:9,background:"transparent",
                         color:role?.color||"#64748b",border:`1.5px solid ${role?.color||"#64748b"}`,
                         borderRadius:3,padding:"1px 5px"}}>{role?.label||r}</span>;
@@ -1115,7 +1210,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
               </div>
             ))}
           </div>
-          {personModal&&<PersonModal person={personModal} roles={data.roles}
+          {personModal&&<PersonModal person={personModal} roles={roles}
             onSave={savePerson} onDelete={deletePerson} onClose={()=>setPersonModal(null)}/>}
         </div>
       )}
@@ -1185,7 +1280,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
         </div>
       )}
 
-      {stageModal&&<StageEditModal stage={stageModal} roles={data.roles} stageGroups={stageGroups}
+      {stageModal&&<StageEditModal stage={stageModal} roles={roles} stageGroups={stageGroups}
         onSave={saveStage} onClose={()=>setStageModal(null)}/>}
     </div>
   );
@@ -1232,12 +1327,13 @@ function PersonModal({person,roles,onSave,onDelete,onClose}){
 }
 
 // ── ПРОЕКТЫ ──────────────────────────────────────────────────────────
-function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSelect}){
+function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSelect,onSeriesSelect}){
   const {sorted:stages,stageGroups,groupMap}=useContext(StagesCtx);
   const [modal,setModal]=useState(null);
   const [directEditSeries,setDirectEditSeries]=useState(null);
   const [archFilter,setArchFilter]=useState("все");
   const [hoveredProj,setHoveredProj]=useState(null);
+  const [hoveredSer,setHoveredSer]=useState(null);
 
   function saveProject(proj){
     let projects=[...data.projects];
@@ -1395,11 +1491,17 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
                     }
                     return (
                       <div key={ser.id}
-                        onDoubleClick={()=>setDirectEditSeries({ser,proj})}
-                        title="Двойной клик — редактировать серию"
-                        style={{background:"#0f172a",cursor:"pointer",
-                          borderTop:`2px solid ${borderColor}`,borderRadius:6,padding:"10px 12px",
-                          display:"flex",flexDirection:"column",gap:6}}>
+                        onDoubleClick={e=>{e.stopPropagation();onSeriesSelect?onSeriesSelect(ser.id):setDirectEditSeries({ser,proj});}}
+                        onMouseEnter={()=>setHoveredSer(ser.id)}
+                        onMouseLeave={()=>setHoveredSer(null)}
+                        title={onSeriesSelect?"Двойной клик — открыть серию":"Двойной клик — редактировать серию"}
+                        style={{background:hoveredSer===ser.id?"#1a2a3a":"#0f172a",cursor:"pointer",
+                          borderTop:`2px solid ${borderColor}`,
+                          border:hoveredSer===ser.id?`1px solid ${borderColor}55`:"1px solid transparent",
+                          borderTopColor:borderColor,
+                          borderRadius:6,padding:"10px 12px",
+                          display:"flex",flexDirection:"column",gap:6,
+                          transition:"background 0.15s,border-color 0.15s"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <span style={{fontWeight:700,fontSize:12}}>{ser.name}</span>
                           {isManual&&<span title="Статус задан вручную" style={{fontSize:9,color:"#f59e0b"}}>🔒</span>}
@@ -1554,7 +1656,8 @@ function SeriesListModal({project,data,onSave,onClose}){
   function deleteSeries(id){
     if(!window.confirm("Удалить серию? Ручные задачи останутся.")) return;
     const allS=(data.series||[]).filter(s=>s.id!==id);
-    const newTasks=data.tasks.filter(t=>!(t.seriesId===id&&t.autogenerated));
+    const todaySort=daySort(formatDate(new Date()));
+    const newTasks=data.tasks.filter(t=>!(t.seriesId===id&&t.autogenerated&&daySort(t.day)>todaySort));
     onSave({series:allS,tasks:newTasks});
   }
 
@@ -1623,15 +1726,16 @@ function SeriesModal({series,onSave,onClose}){
             <Inp value={f.name} onChange={v=>sf({name:v})} placeholder="С01"/>
           </Field>
           <div style={{fontSize:11,color:"#64748b",letterSpacing:1,marginBottom:10}}>СЪЁМКИ</div>
-          <Field label="Начало съёмок"><InpDate value={f.shootStart} onChange={v=>sf({shootStart:v})}/></Field>
-          <Field label="Конец съёмок"><InpDate value={f.shootEnd} onChange={v=>sf({shootEnd:v})}/></Field>
+          <Field label="Начало съёмок"><InpDate value={f.shootStart||""} onChange={v=>sf({shootStart:v})}/></Field>
+          <div style={{fontSize:11,color:"#64748b",letterSpacing:1,margin:"14px 0 10px"}}>СИНХРА</div>
+          <Field label="Начало синхры"><InpDate value={f.syncStart||""} onChange={v=>sf({syncStart:v})}/></Field>
           <div style={{fontSize:11,color:"#64748b",letterSpacing:1,margin:"14px 0 10px"}}>ПОСТПРОДАКШН</div>
-          <Field label="Старт монтажа"><InpDate value={f.editStart} onChange={v=>sf({editStart:v})}/></Field>
+          <Field label="Старт монтажа"><InpDate value={f.editStart||""} onChange={v=>sf({editStart:v})}/></Field>
           <Field label="Дата Пред-ОТК">
-            <InpDate value={f.preOtkDate} onChange={v=>sf({preOtkDate:v})} warn={preOtkWarn}/>
+            <InpDate value={f.preOtkDate||""} onChange={v=>sf({preOtkDate:v})} warn={preOtkWarn}/>
           </Field>
           <Field label="Дата ОТК (сдача каналу)">
-            <InpDate value={f.otkDate} onChange={v=>sf({otkDate:v})} warn={otkWarn}/>
+            <InpDate value={f.otkDate||""} onChange={v=>sf({otkDate:v})} warn={otkWarn}/>
           </Field>
         </div>
         <div>
@@ -1645,17 +1749,20 @@ function SeriesModal({series,onSave,onClose}){
               📺 Эфир: {f.airDate}
             </div>
           )}
-          <div style={{marginTop:20,background:"rgba(59,130,246,0.07)",border:"1px solid rgba(59,130,246,0.2)",
-            borderRadius:6,padding:"10px 12px",fontSize:12,color:"#64748b"}}>
-            <div style={{fontWeight:600,color:"#94a3b8",marginBottom:6}}>Авто-задачи при сохранении</div>
-            {f.shootStart?<div style={{marginBottom:2}}>• Съёмки → {f.shootStart}</div>:null}
-            {f.editStart?<div style={{marginBottom:2}}>• Монтаж (5 дней) → с {f.editStart}</div>:null}
-            {f.preOtkDate?<div style={{marginBottom:2}}>• Пред-ОТК → {f.preOtkDate}</div>:null}
-            {f.otkDate?<div style={{marginBottom:2}}>• Сдача ОТК → {f.otkDate}</div>:null}
-            {!f.shootStart&&!f.editStart&&!f.preOtkDate&&!f.otkDate&&(
-              <div style={{color:"#334155"}}>Заполните даты — задачи создадутся автоматически</div>
-            )}
-          </div>
+          {isNew&&(
+            <div style={{marginTop:20,background:"rgba(59,130,246,0.07)",border:"1px solid rgba(59,130,246,0.2)",
+              borderRadius:6,padding:"10px 12px",fontSize:12,color:"#64748b"}}>
+              <div style={{fontWeight:600,color:"#94a3b8",marginBottom:6}}>Пустые смены при создании</div>
+              {f.shootStart?<div style={{marginBottom:2}}>• Съёмки (3 смены) → с {f.shootStart}</div>:null}
+              {f.syncStart?<div style={{marginBottom:2}}>• Синхра (2 смены) → с {f.syncStart}</div>:null}
+              {f.editStart?<div style={{marginBottom:2}}>• Монтаж (5 смен) → с {f.editStart}</div>:null}
+              {f.preOtkDate?<div style={{marginBottom:2}}>• Пред-ОТК → {f.preOtkDate}</div>:null}
+              {f.otkDate?<div style={{marginBottom:2}}>• Сдача ОТК → {f.otkDate}</div>:null}
+              {!f.shootStart&&!f.syncStart&&!f.editStart&&!f.preOtkDate&&!f.otkDate&&(
+                <div style={{color:"#334155"}}>Заполните даты — смены создадутся автоматически</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20,
@@ -1668,11 +1775,12 @@ function SeriesModal({series,onSave,onClose}){
 }
 
 // ── КАЛЕНДАРЬ ────────────────────────────────────────────────────────
-function CalendarView({data}){
+function CalendarView({data,onGoToGantt}){
   const today=new Date();
   const [year,setYear]=useState(today.getFullYear());
   const [month,setMonth]=useState(today.getMonth());
   const [selectedDay,setSelectedDay]=useState(null);
+  const [hovDay,setHovDay]=useState(null);
 
   function prevMonth(){if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}
   function nextMonth(){if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}
@@ -1754,7 +1862,10 @@ function CalendarView({data}){
             const dayMil=ds?(milestones[ds]||[]):[];
             const projsWithTasks=[...new Set(dayTasks.map(t=>t.project))];
             return (
-              <div key={i} onClick={()=>d&&setSelectedDay(isSel?null:d)}
+              <div key={i}
+                onClick={()=>d&&setSelectedDay(isSel?null:d)}
+                onMouseEnter={d&&dayTasks.length?e=>setHovDay({ds,dayTasks,rect:e.currentTarget.getBoundingClientRect()}):undefined}
+                onMouseLeave={()=>setHovDay(null)}
                 style={{minHeight:80,background:isSel?"#1e3a5f":isToday?"rgba(59,130,246,0.1)":"#1e293b",
                   border:`1px solid ${isSel?"#3b82f6":isToday?"rgba(59,130,246,0.4)":"#263352"}`,
                   borderRadius:6,padding:4,cursor:d?"pointer":"default",
@@ -1842,12 +1953,50 @@ function CalendarView({data}){
             <div key={person} style={{marginBottom:10}}>
               <div style={{fontSize:10,color:"#475569",letterSpacing:1,marginBottom:4}}>{person.toUpperCase()}</div>
               {selTasks.filter(t=>t.person===person).map(t=>(
-                <TaskCard key={t.id} task={t} projects={data.projects}/>
+                <div key={t.id} onDoubleClick={()=>onGoToGantt&&onGoToGantt(t.day)}
+                  title={onGoToGantt?"Двойной клик — открыть в Ганте":undefined}>
+                  <TaskCard task={t} projects={data.projects}
+                    onHover={(tk,r)=>setHovDay(tk?{task:tk,rect:r,single:true}:null)}/>
+                </div>
               ))}
             </div>
           ))}
         </div>
       )}
+      {hovDay&&!hovDay.single&&(
+        <CalendarDayTooltip dayTasks={hovDay.dayTasks} ds={hovDay.ds} rect={hovDay.rect} projects={data.projects}/>
+      )}
+      {hovDay?.single&&(
+        <TaskTooltip task={hovDay.task} rect={hovDay.rect} projects={data.projects}/>
+      )}
+    </div>
+  );
+}
+function CalendarDayTooltip({dayTasks,ds,rect,projects}){
+  const {stageMap}=useContext(StagesCtx);
+  if(!dayTasks?.length) return null;
+  const W=260; const vw=window.innerWidth; const vh=window.innerHeight;
+  let left=rect.right+8; if(left+W>vw-16) left=rect.left-W-8;
+  let top=rect.top; if(top+dayTasks.length*22+40>vh-16) top=Math.max(8,vh-dayTasks.length*22-56);
+  return (
+    <div style={{position:"fixed",left,top,zIndex:9999,width:W,
+      background:"#0f172a",border:"1px solid #475569",borderRadius:8,
+      padding:"10px 14px",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,0.65)"}}>
+      <div style={{fontSize:10,color:"#64748b",letterSpacing:1,marginBottom:8}}>{ds} · {dayTasks.length} смен</div>
+      {dayTasks.slice(0,12).map((t,i)=>{
+        const st=stageMap[t.status];
+        const c=projColor(projects,t.project);
+        return (
+          <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:c,flexShrink:0}}/>
+            <span style={{fontSize:11,color:st?st.color:"#94a3b8",fontWeight:600,flexShrink:0,minWidth:90,
+              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st?.label||t.status}</span>
+            <span style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.person||"—"}</span>
+            <span style={{fontSize:10,color:"#334155",flexShrink:0,marginLeft:"auto"}}>{t.from}–{t.to}</span>
+          </div>
+        );
+      })}
+      {dayTasks.length>12&&<div style={{fontSize:10,color:"#475569",marginTop:4}}>…ещё {dayTasks.length-12}</div>}
     </div>
   );
 }
@@ -1879,14 +2028,24 @@ function GanttTooltip({task,rect,stageMap}){
   );
 }
 
-function GanttView({data,onUpdate,onSeriesSelect}){
+function GanttView({data,onUpdate,onSeriesSelect,startDay}){
   const {sorted:stages,stageMap,groupMap}=useContext(StagesCtx);
-  const [weekOffset,setWeekOffset]=useState(0);
+  const [weekOffset,setWeekOffset]=useState(()=>{
+    if(!startDay) return 0;
+    const d=parseDate(startDay); if(!d) return 0;
+    const today=new Date(); const todayDay=today.getDay()||7;
+    const mon=new Date(today); mon.setDate(today.getDate()-todayDay+1); mon.setHours(0,0,0,0);
+    return Math.floor((d-mon)/(7*24*60*60*1000));
+  });
   const [taskModal,setTaskModal]=useState(null);
   const [collapsedProjects,setCollapsedProjects]=useState(new Set());
   const [expandedSeries,setExpandedSeries]=useState(new Set());
   const [hoverTask,setHoverTask]=useState(null);
   const [projectOrder,setProjectOrder]=useState(null);
+  const [shiftTailMode,setShiftTailMode]=useState(false);
+  const [selectedTasks,setSelectedTasks]=useState(new Set());
+  const [lassoRange,setLassoRange]=useState(null);
+  const lassoRef=useRef(null);
   const dragRef=useRef(null);
   const projDragRef=useRef(null);
 
@@ -1894,6 +2053,11 @@ function GanttView({data,onUpdate,onSeriesSelect}){
     function h(){setTaskModal({});}
     window.addEventListener("gantt-new-task",h);
     return ()=>window.removeEventListener("gantt-new-task",h);
+  },[]);
+  useEffect(()=>{
+    function h(e){if(e.key==="Escape") setSelectedTasks(new Set());}
+    document.addEventListener("keydown",h);
+    return()=>document.removeEventListener("keydown",h);
   },[]);
 
   const refMonday=useMemo(()=>{
@@ -1913,6 +2077,14 @@ function GanttView({data,onUpdate,onSeriesSelect}){
 
   const todayStr=formatDate(new Date());
 
+  const groupColorMap=useMemo(()=>{
+    const m={};
+    [...stages].sort((a,b)=>(a.order||0)-(b.order||0)).forEach(s=>{
+      if(s.groupId&&!m[s.groupId]) m[s.groupId]=s.color;
+    });
+    return m;
+  },[stages]);
+
   const orderedProjects=useMemo(()=>{
     const active=data.projects.filter(p=>p.status!=="архив");
     if(!projectOrder) return active;
@@ -1928,6 +2100,23 @@ function GanttView({data,onUpdate,onSeriesSelect}){
   function toggleExpandSer(key){
     setExpandedSeries(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);return n;});
   }
+
+  useEffect(()=>{
+    function onUp(){
+      if(!lassoRef.current) return;
+      const {projId,serName,startDayIdx,endDayIdx}=lassoRef.current;
+      lassoRef.current=null; setLassoRange(null);
+      if(startDayIdx===endDayIdx) return;
+      const d1=Math.min(startDayIdx,endDayIdx); const d2=Math.max(startDayIdx,endDayIdx);
+      const sel=new Set(data.tasks.filter(t=>{
+        const idx=days.indexOf(t.day);
+        return t.project===projId&&t.series===serName&&idx>=d1&&idx<=d2;
+      }).map(t=>t.id));
+      setSelectedTasks(sel);
+    }
+    document.addEventListener("mouseup",onUp);
+    return()=>document.removeEventListener("mouseup",onUp);
+  },[data.tasks,days]);
 
   function handleProjDragStart(e,projId){
     projDragRef.current=projId;
@@ -1979,27 +2168,50 @@ function GanttView({data,onUpdate,onSeriesSelect}){
   function handleDrop(e,row,d){
     e.preventDefault();
     const drag=dragRef.current; if(!drag) return;
-    const {task,copy}=drag; dragRef.current=null;
-    if(copy){
-      const newTask={...task,id:genId(data.tasks),day:d,project:row.projId,series:row.series};
+    const {task,copy,multiTaskIds}=drag; dragRef.current=null;
+    const ser=(data.series||[]).find(s=>s.projectId===row.projId&&s.name===row.series);
+    const newSeriesId=ser?.id||null;
+    // Template drop — create task directly
+    if(drag.template){
+      onUpdate("tasks",[...data.tasks,{
+        id:genId(data.tasks),project:row.projId,series:row.series,seriesId:newSeriesId,
+        status:drag.status,day:d,from:10,to:19,person:"",note:"",autogenerated:false,unplanned:false,
+      }]); return;
+    }
+    // Single copy (alt+drag one task)
+    if(copy&&(!multiTaskIds||multiTaskIds.size<=1)){
+      const newTask={...task,id:genId(data.tasks),day:d,project:row.projId,series:row.series,seriesId:newSeriesId};
       delete newTask._cascadeAll;
       onUpdate("tasks",[...data.tasks,newTask]); return;
+    }
+    const diff=Math.round((parseDate(d)-parseDate(task.day))/(1000*60*60*24));
+    // Multi-select drag (move or copy)
+    if(multiTaskIds&&multiTaskIds.size>1){
+      if(copy){
+        let nid=Math.max(0,...data.tasks.map(t=>+t.id||0))+1;
+        const newTasks=data.tasks.filter(t=>multiTaskIds.has(t.id))
+          .map(t=>({...t,id:nid++,day:addDays(t.day,diff),project:row.projId,series:row.series,seriesId:newSeriesId}));
+        onUpdate("tasks",[...data.tasks,...newTasks]);
+      } else if(diff!==0||row.projId!==task.project||row.series!==task.series){
+        const tasks=data.tasks.map(t=>multiTaskIds.has(t.id)?
+          {...t,day:addDays(t.day,diff),project:row.projId,series:row.series,seriesId:newSeriesId}:t);
+        onUpdate("tasks",tasks);
+      }
+      setSelectedTasks(new Set()); return;
     }
     if(d===task.day&&row.projId===task.project&&row.series===task.series) return;
     const hasTail=data.tasks.some(t=>
       t.project===task.project&&t.series===task.series&&t.day>task.day&&t.id!==task.id);
-    const diff=(parseDate(d)-parseDate(task.day))/(1000*60*60*24);
     const applyMove=(cascade)=>{
       const tasks=data.tasks.map(t=>{
-        if(t.id===task.id) return {...t,day:d,project:row.projId,series:row.series};
+        if(t.id===task.id) return {...t,day:d,project:row.projId,series:row.series,seriesId:newSeriesId};
         if(cascade&&t.project===task.project&&t.series===task.series&&t.day>task.day)
           return {...t,day:addDays(t.day,diff)};
         return t;
       });
       onUpdate("tasks",tasks);
     };
-    if(hasTail&&diff!==0){const ok=window.confirm("Сдвинуть весь хвост серии?");applyMove(ok);}
-    else applyMove(false);
+    applyMove(hasTail&&diff!==0&&shiftTailMode);
   }
 
   const COL=52;
@@ -2018,12 +2230,49 @@ function GanttView({data,onUpdate,onSeriesSelect}){
 
   return (
     <div>
-      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
         <Btn variant="ghost" onClick={()=>setWeekOffset(w=>w-1)}>← Пред. неделя</Btn>
         <Btn variant="ghost" small onClick={()=>setWeekOffset(0)}>Сегодня</Btn>
         <Btn variant="ghost" onClick={()=>setWeekOffset(w=>w+1)}>След. неделя →</Btn>
+        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",
+          background:"rgba(255,255,255,0.04)",borderRadius:6,padding:"4px 10px",
+          border:`1px solid ${shiftTailMode?"#f59e0b33":"#334155"}`,fontSize:12,userSelect:"none"}}>
+          <input type="checkbox" checked={shiftTailMode}
+            onChange={e=>setShiftTailMode(e.target.checked)} style={{accentColor:"#f59e0b"}}/>
+          <span style={{color:shiftTailMode?"#f59e0b":"#64748b"}}>Сдвигать хвост</span>
+        </label>
+        {selectedTasks.size>0&&(
+          <span style={{fontSize:12,color:"#60a5fa",background:"rgba(59,130,246,0.1)",
+            borderRadius:6,padding:"4px 10px",border:"1px solid rgba(59,130,246,0.3)",cursor:"default"}}
+            title="Esc — снять выделение">
+            ✓ {selectedTasks.size} выбрано · Alt+перетащи = копировать · Esc = снять
+          </span>
+        )}
         <div style={{flex:1}}/>
         <Btn variant="primary" onClick={()=>setTaskModal({})}>+ Задача</Btn>
+      </div>
+      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#475569",letterSpacing:1,flexShrink:0}}>ШАБЛОНЫ:</span>
+        {GANTT_TEMPLATES.map(tmpl=>{
+          const st=stageMap[tmpl.status];
+          return (
+            <div key={tmpl.status}
+              draggable
+              onDragStart={e=>{
+                dragRef.current={template:true,status:tmpl.status};
+                e.dataTransfer.effectAllowed="copy";
+              }}
+              onDragEnd={()=>{dragRef.current=null;}}
+              title={`Перетащи на ячейку → создаст задачу "${tmpl.label}"`}
+              style={{display:"inline-flex",alignItems:"center",padding:"3px 9px",
+                borderRadius:5,cursor:"grab",userSelect:"none",fontSize:11,fontWeight:600,
+                background:st?stageBg(st.color):"rgba(255,255,255,0.06)",
+                border:`1px dashed ${st?st.color:"#475569"}`,
+                color:st?st.color:"#94a3b8"}}>
+              {tmpl.label}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{overflow:"auto",maxHeight:"calc(100vh - 220px)",border:"1px solid #1e293b",borderRadius:8}}
@@ -2102,15 +2351,9 @@ function GanttView({data,onUpdate,onSeriesSelect}){
                     </span>}
                     <span style={{fontSize:9,color:"#475569",flexShrink:0}}>{isCollapsed?"▶":"▼"}</span>
                   </div>
-                  {days.map(d=>{
-                    const pd=parseDate(d); const isMon=pd?.getDay()===1;
-                    const isToday=d===todayStr;
-                    return (
-                      <div key={d} style={{width:COL,flexShrink:0,
-                        borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
-                        background:isToday?"rgba(59,130,246,0.04)":"transparent"}}/>
-                    );
-                  })}
+                  {days.map(d=>(
+                    <div key={d} style={{width:COL,flexShrink:0}}/>
+                  ))}
                 </div>
 
                 {/* Серии */}
@@ -2156,46 +2399,81 @@ function GanttView({data,onUpdate,onSeriesSelect}){
                       </div>
 
                       {/* Ячейки дней */}
-                      {days.map(d=>{
+                      {days.map((d,dIdx)=>{
                         const cellTasks=seriesTasks.filter(t=>t.day===d);
                         const isToday=d===todayStr;
                         const pd=parseDate(d); const isMon=pd?.getDay()===1;
+                        const isInLasso=lassoRange&&
+                          lassoRange.projId===proj.id&&lassoRange.serName===ser.name&&
+                          dIdx>=lassoRange.minIdx&&dIdx<=lassoRange.maxIdx;
                         return (
                           <div key={d}
-                            onClick={()=>setTaskModal({project:proj.id,series:ser.name,day:d})}
+                            onClick={()=>{
+                              if(selectedTasks.size>0){setSelectedTasks(new Set());return;}
+                              setTaskModal({project:proj.id,series:ser.name,day:d});
+                            }}
+                            onMouseDown={e=>{
+                              if(e.button!==0) return;
+                              lassoRef.current={projId:proj.id,serName:ser.name,startDayIdx:dIdx,endDayIdx:dIdx};
+                            }}
+                            onMouseEnter={e=>{
+                              if(lassoRef.current&&lassoRef.current.projId===proj.id&&lassoRef.current.serName===ser.name){
+                                lassoRef.current.endDayIdx=dIdx;
+                                const[a,b]=[lassoRef.current.startDayIdx,dIdx];
+                                setLassoRange({projId:proj.id,serName:ser.name,minIdx:Math.min(a,b),maxIdx:Math.max(a,b)});
+                              } else if(!dragRef.current){
+                                e.currentTarget.style.background=isToday?"rgba(59,130,246,0.12)":"rgba(255,255,255,0.03)";
+                              }
+                            }}
+                            onMouseLeave={e=>{
+                              if(!lassoRef.current)
+                                e.currentTarget.style.background=isInLasso?"rgba(59,130,246,0.15)":(isToday?"rgba(59,130,246,0.06)":"transparent");
+                            }}
                             onDragOver={e=>{e.preventDefault();
-                              e.dataTransfer.dropEffect=dragRef.current?.copy?"copy":"move";}}
+                              e.dataTransfer.dropEffect=(dragRef.current?.copy||dragRef.current?.template)?"copy":"move";}}
                             onDrop={e=>handleDrop(e,{projId:proj.id,series:ser.name},d)}
                             style={{width:COL,flexShrink:0,
                               borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
                               padding:2,display:"flex",flexDirection:"column",gap:1,
                               cursor:"pointer",overflow:"hidden",
-                              background:isToday?"rgba(59,130,246,0.06)":"transparent",
-                              transition:"background 0.1s"}}
-                            onMouseEnter={e=>{if(!dragRef.current)
-                              e.currentTarget.style.background=isToday?"rgba(59,130,246,0.12)":"rgba(255,255,255,0.03)";}}
-                            onMouseLeave={e=>e.currentTarget.style.background=
-                              isToday?"rgba(59,130,246,0.06)":"transparent"}>
+                              background:isInLasso?"rgba(59,130,246,0.18)":(isToday?"rgba(59,130,246,0.06)":"transparent"),
+                              transition:"background 0.1s",userSelect:"none"}}>
                             {cellTasks.map(t=>{
                               const st=stageMap[t.status];
+                              const grpColor=st?.groupId?groupColorMap[st.groupId]:undefined;
+                              const barColor=grpColor||proj.color;
+                              const isSel=selectedTasks.has(t.id);
                               return (
                                 <div key={t.id}
                                   draggable
+                                  onMouseDown={e=>e.stopPropagation()}
                                   onDragStart={e=>{
                                     e.stopPropagation();
-                                    dragRef.current={task:t,copy:e.altKey};
+                                    const multi=isSel&&selectedTasks.size>1?selectedTasks:null;
+                                    dragRef.current={task:t,copy:e.altKey,multiTaskIds:multi};
                                     e.dataTransfer.effectAllowed=e.altKey?"copy":"move";
                                   }}
                                   onDragEnd={()=>{dragRef.current=null;}}
-                                  onClick={e=>{e.stopPropagation();setTaskModal(t);}}
+                                  onClick={e=>{
+                                    e.stopPropagation();
+                                    if(e.shiftKey){
+                                      setSelectedTasks(prev=>{
+                                        const n=new Set(prev);
+                                        n.has(t.id)?n.delete(t.id):n.add(t.id);
+                                        return n;
+                                      });
+                                    } else {
+                                      setTaskModal(t);
+                                    }
+                                  }}
                                   onMouseEnter={e=>{
                                     e.stopPropagation();
                                     setHoverTask({task:t,rect:e.currentTarget.getBoundingClientRect()});
                                   }}
                                   onMouseLeave={e=>{e.stopPropagation();setHoverTask(null);}}
-                                  style={{background:st?stageBg(st.color):"rgba(255,255,255,0.08)",
-                                    border:`1px solid ${st?stageBorder(st.color):"#334155"}`,
-                                    borderLeft:`3px solid ${proj.color}`,
+                                  style={{background:isSel?`${st?.color||"#3b82f6"}33`:st?stageBg(st.color):"rgba(255,255,255,0.08)",
+                                    border:isSel?`2px solid ${st?.color||"#3b82f6"}`:`1px solid ${st?stageBorder(st.color):"#334155"}`,
+                                    borderLeft:`3px solid ${barColor}`,
                                     borderRadius:3,flexShrink:0,overflow:"hidden",
                                     color:st?st.color:"#94a3b8",cursor:"grab",userSelect:"none",
                                     padding:isExpanded?"3px 5px":"1px 3px"}}>
@@ -2317,7 +2595,7 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
       )}
       <Field label="Проект">
         <SelSearch value={form.project} onChange={v=>sf({project:v,series:"",person:""})}
-          options={data.projects.map(p=>({value:p.id,label:p.name}))} placeholder="Выбрать проект..." autoFocus/>
+          options={data.projects.map(p=>({value:p.id,label:p.name}))} placeholder="Выбрать проект..." autoFocus={isNew}/>
       </Field>
       <Field label="Серия">
         <SelSearch value={form.series} onChange={v=>sf({series:v})}
@@ -2388,6 +2666,7 @@ function DaysView({data,conflictIds}){
   const [groupBy,setGroupBy]=useState("day");
   const [filterPerson,setFilterPerson]=useState("");
   const [filterProject,setFilterProject]=useState("");
+  const [hovTask,setHovTask]=useState(null);
   const tasks=useMemo(()=>enrichTasks(data.tasks),[data.tasks]);
   const people=useMemo(()=>[...new Set(tasks.map(t=>t.person))].sort(),[tasks]);
   const containerRef=useRef(null);
@@ -2433,7 +2712,7 @@ function DaysView({data,conflictIds}){
             return (
               <div key={person} style={{marginBottom:compact?4:6}}>
                 <div style={{fontSize:compact?8:9,color:"#475569",letterSpacing:1,marginBottom:2}}>{person.toUpperCase()}</div>
-                {pt.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)}/>)}
+                {pt.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
               </div>
             );
           })}
@@ -2515,6 +2794,7 @@ function DaysView({data,conflictIds}){
           </div>
         )}
       </div>
+      {hovTask&&<TaskTooltip task={hovTask.task} rect={hovTask.rect} projects={data.projects}/>}
     </div>
   );
 }
@@ -2524,6 +2804,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
   const [selPeople,setSelPeople]=useState([]);
   const [filterProject,setFilterProject]=useState("");
   const [groupBy,setGroupBy]=useState("day");
+  const [hovTask,setHovTask]=useState(null);
   const tasks=useMemo(()=>enrichTasks(data.tasks),[data.tasks]);
   const people=useMemo(()=>[...new Set(tasks.map(t=>t.person))].sort(),[tasks]);
   const containerRef=useRef(null);
@@ -2632,7 +2913,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
                       <div style={{fontSize:9,color:hasC?"#f87171":"#475569",marginBottom:5,letterSpacing:0.5}}>
                         {label}{hasC&&" ⚡"}
                       </div>
-                      {gtasks.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)}/>)}
+                      {gtasks.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
                     </div>
                   );
                 })}
@@ -2641,6 +2922,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
           );
         })}
       </div>
+      {hovTask&&<TaskTooltip task={hovTask.task} rect={hovTask.rect} projects={data.projects}/>}
     </div>
   );
 }
@@ -3856,6 +4138,11 @@ function SeriesCard({seriesId,data,onBatchUpdate}){
                 borderRadius:6,color:"#e2e8f0",padding:"8px 10px",fontSize:13,
                 width:"100%",fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
           </Field>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:8,
+            borderTop:"1px solid #334155",paddingTop:14}}>
+            <Btn variant="ghost" onClick={()=>setNewCLForm(null)}>Отмена</Btn>
+            <Btn variant="primary" onClick={createChecklist}>Сохранить</Btn>
+          </div>
         </Modal>
       )}
     </div>
@@ -3885,17 +4172,38 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
   function saveSeries(serData){
     let allS=[...(data.series||[])];
     let final;
-    if(serData.id&&allS.find(s=>s.id===serData.id)){
+    const isNew=!serData.id||!allS.find(s=>s.id===serData.id);
+    if(!isNew){
       allS=allS.map(s=>s.id===serData.id?serData:s);
       final=serData;
     } else {
+      // Map series dates → КПП stageRanges using group label matching
+      const findGid=kw=>stageGroups.find(g=>new RegExp(kw,"i").test(g.label))?.id;
+      const sr={};
+      if(serData.shootStart){
+        const gid=findGid("съём");
+        if(gid) sr[gid]={from:serData.shootStart,to:addDays(serData.shootStart,2)};
+      }
+      if(serData.syncStart){
+        const gid=findGid("синхр");
+        if(gid) sr[gid]={from:serData.syncStart,to:addDays(serData.syncStart,1)};
+      }
+      if(serData.editStart){
+        const gid=findGid("монтаж");
+        if(gid) sr[gid]={from:serData.editStart,to:""};
+      }
+      if(serData.otkDate){
+        const gid=findGid("отк");
+        if(gid) sr[gid]={from:serData.otkDate,to:""};
+      }
       final={...serData,id:"s"+Date.now(),projectId,
         order:allS.filter(s=>s.projectId===projectId).length,
+        syncStart:serData.syncStart||"",
         transitCode:"",transitVariants:["","",""],
-        checklists:[],notes:"",delivered:false,deliveredAt:""};
+        checklists:[],notes:"",delivered:false,deliveredAt:"",
+        stageRanges:{...sr}};
       allS.push(final);
     }
-    const isNew=!serData.id;
     const newTasks=isNew?generateAutoTasks(final,data.tasks):data.tasks;
     onBatchUpdate({series:allS,tasks:newTasks});
     setEditSeries(null);
@@ -3904,7 +4212,8 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
   function deleteSeries(id){
     if(!window.confirm("Удалить серию? Ручные задачи останутся.")) return;
     const allS=(data.series||[]).filter(s=>s.id!==id);
-    const newTasks=data.tasks.filter(t=>!(t.seriesId===id&&t.autogenerated));
+    const todaySort=daySort(formatDate(new Date()));
+    const newTasks=data.tasks.filter(t=>!(t.seriesId===id&&t.autogenerated&&daySort(t.day)>todaySort));
     onBatchUpdate({series:allS,tasks:newTasks});
   }
 
@@ -3915,8 +4224,7 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
 
   const TABS=[
     {id:"general",label:"Общее"},
-    {id:"series",label:`Серии (${projSeries.length})`},
-    {id:"kpp",label:"КПП"},
+    {id:"kpp",label:`КПП (${projSeries.length})`},
     {id:"info",label:"Информация"},
     {id:"transits",label:"Транзиты"},
     {id:"access",label:"Доступы и ссылки"},
@@ -4025,9 +4333,9 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
         </div>
       )}
 
-      {tab==="series"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:4}}>
+      {tab==="kpp"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",justifyContent:"flex-end"}}>
             <Btn variant="primary" small
               onClick={()=>setEditSeries({name:"",projectId,shootStart:"",shootEnd:"",
                 editStart:"",preOtkDate:"",otkDate:"",airDate:"",
@@ -4035,132 +4343,105 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
               + Новая серия
             </Btn>
           </div>
-          {projSeries.map(ser=>(
-            <div key={ser.id}
-              onDoubleClick={()=>onSeriesSelect&&onSeriesSelect(ser.id)}
-              title="Двойной клик — открыть карточку серии"
-              style={{background:"#1e293b",borderRadius:10,padding:"16px 20px",cursor:"pointer",
-                border:"1px solid #334155",borderLeft:`3px solid ${ser.delivered?"#22c55e":proj.color}`,
-                opacity:ser.delivered?0.75:1}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <span style={{fontWeight:700,fontSize:15,display:"flex",alignItems:"center",gap:8}}>
-                  {ser.name}
-                  {ser.delivered&&<span style={{fontSize:11,color:"#22c55e",background:"#22c55e1a",
-                    border:"1px solid #22c55e44",borderRadius:4,padding:"1px 6px"}}>✓ Сдана</span>}
-                </span>
-                <div style={{display:"flex",gap:6}}>
-                  <Btn small variant="ghost" onClick={()=>setEditSeries(ser)}>Изменить</Btn>
-                  <button onClick={()=>deleteSeries(ser.id)}
-                    style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",
-                      fontSize:16,padding:"0 4px",lineHeight:1}}>×</button>
-                </div>
+          <div style={{background:"#1e293b",borderRadius:10,border:"1px solid #334155",overflowX:"auto"}}>
+            {projSeries.length===0?(
+              <div style={{padding:32,color:"#475569",fontSize:14,textAlign:"center"}}>
+                Нет серий — нажмите «+ Новая серия»
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:6,fontSize:12}}>
-                {[
-                  {l:"Съёмки",v:ser.shootStart&&ser.shootEnd?`${ser.shootStart} — ${ser.shootEnd}`:""},
-                  {l:"Монтаж с",v:ser.editStart||""},
-                  {l:"ПредОТК",v:ser.preOtkDate||""},
-                  {l:"ОТК",v:ser.otkDate||""},
-                  {l:"Эфир",v:ser.airDate||""},
-                ].filter(x=>x.v).map(({l,v},i)=>(
-                  <div key={i} style={{background:"#0f172a",borderRadius:6,padding:"6px 10px"}}>
-                    <div style={{color:"#475569",fontSize:10,marginBottom:2}}>{l}</div>
-                    <div style={{color:"#e2e8f0",fontWeight:500}}>{v}</div>
-                  </div>
-                ))}
-                {![ser.shootStart,ser.editStart,ser.preOtkDate,ser.otkDate,ser.airDate].some(Boolean)&&(
-                  <div style={{color:"#334155",fontSize:12,gridColumn:"1/-1"}}>Даты не заданы</div>
-                )}
-              </div>
-            </div>
-          ))}
-          {projSeries.length===0&&<div style={{color:"#475569",padding:24,fontSize:14}}>Нет серий — нажмите «+ Новая серия»</div>}
-        </div>
-      )}
-
-      {tab==="kpp"&&(
-        <div style={{background:"#1e293b",borderRadius:10,border:"1px solid #334155",overflowX:"auto"}}>
-          {projSeries.length===0?(
-            <div style={{padding:24,color:"#475569",fontSize:14}}>Нет серий</div>
-          ):(
-            <table style={{borderCollapse:"collapse"}}>
-              <thead>
-                <tr>
-                  <th style={{padding:"7px 14px",fontSize:11,color:"#64748b",letterSpacing:1,
-                    textAlign:"left",borderBottom:"2px solid #334155",borderRight:"2px solid #334155",
-                    position:"sticky",left:0,background:"#1e293b",zIndex:3,
-                    whiteSpace:"nowrap",minWidth:150}}>
-                    ЭТАП
-                  </th>
-                  {projSeries.map(ser=>(
-                    <th key={ser.id} style={{padding:"7px 10px",fontSize:12,fontWeight:700,
-                      textAlign:"center",borderBottom:"2px solid #334155",
-                      borderLeft:"1px solid #334155",minWidth:112,whiteSpace:"nowrap",
-                      color:ser.delivered?"#22c55e":"#e2e8f0"}}>
-                      {ser.name}{ser.delivered?" ✓":""}
+            ):(
+              <table style={{borderCollapse:"collapse"}}>
+                <thead>
+                  <tr>
+                    <th style={{padding:"7px 14px",fontSize:11,color:"#64748b",letterSpacing:1,
+                      textAlign:"left",borderBottom:"2px solid #334155",borderRight:"2px solid #334155",
+                      position:"sticky",left:0,background:"#1e293b",zIndex:3,
+                      whiteSpace:"nowrap",minWidth:150}}>
+                      ЭТАП
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[...stageGroups].reverse().map(g=>{
-                  const stg=stages.find(s=>s.groupId===g.id);
-                  const c=stg?.color||"#475569";
-                  return (
-                    <React.Fragment key={g.id}>
-                      {["from","to"].map((field,fi)=>(
-                        <tr key={field}>
-                          <td style={{padding:"3px 12px",
-                            position:"sticky",left:0,zIndex:2,
-                            background:"#1e293b",
-                            borderLeft:`3px solid ${fi===0?c:c+"44"}`,
-                            borderRight:"2px solid #334155",
-                            borderBottom:fi===1?"1px solid #334155":"none",
-                            whiteSpace:"nowrap"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:7}}>
-                              <span style={{fontSize:11,
-                                fontWeight:fi===0?700:400,
-                                color:fi===0?c:"#334155"}}>
-                                {fi===0?g.label:""}
-                              </span>
-                              <span style={{fontSize:10,fontWeight:700,flexShrink:0,
-                                color:fi===0?"#94a3b8":"#475569",
-                                background:"#0f172a",borderRadius:3,padding:"1px 5px"}}>
-                                {fi===0?"С":"ПО"}
-                              </span>
-                            </div>
-                          </td>
-                          {projSeries.map(ser=>{
-                            const r=(ser.stageRanges||{})[g.id]||{};
-                            const val=r[field]||"";
-                            function setVal(v){
-                              const old=ser.stageRanges||{};
-                              const nr={...old,[g.id]:{...(old[g.id]||{}),[field]:v}};
-                              onBatchUpdate({series:(data.series||[]).map(s=>s.id===ser.id?{...s,stageRanges:nr}:s),tasks:data.tasks});
-                            }
-                            return (
-                              <td key={ser.id} style={{padding:"1px 3px",
-                                borderLeft:"1px solid #0f172a",
-                                borderBottom:fi===1?"1px solid #1e293b":"none",
-                                background:val?`${c}0d`:"transparent"}}>
-                                <input type="date"
-                                  value={toInput(val)}
-                                  onChange={e=>setVal(fromInput(e.target.value))}
-                                  style={{background:"transparent",border:"none",
-                                    color:val?"#e2e8f0":"#1e293b",fontSize:11,
-                                    outline:"none",width:108,cursor:"pointer",
-                                    fontFamily:"inherit"}}/>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+                    {projSeries.map(ser=>(
+                      <th key={ser.id} style={{padding:"6px 10px",fontSize:12,fontWeight:700,
+                        textAlign:"center",borderBottom:"2px solid #334155",
+                        borderLeft:"1px solid #334155",minWidth:130,whiteSpace:"nowrap"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                          <span
+                            title="Двойной клик — открыть карточку серии"
+                            onDoubleClick={()=>onSeriesSelect&&onSeriesSelect(ser.id)}
+                            style={{cursor:"pointer",
+                              color:ser.delivered?"#22c55e":"#e2e8f0",
+                              borderBottom:"1px dashed #334155"}}>
+                            {ser.name}{ser.delivered?" ✓":""}
+                          </span>
+                          <button title="Редактировать" onClick={()=>setEditSeries(ser)}
+                            style={{background:"none",border:"none",color:"#475569",cursor:"pointer",
+                              fontSize:11,padding:"0 2px",lineHeight:1,flexShrink:0}}>✏</button>
+                          <button title="Удалить" onClick={()=>deleteSeries(ser.id)}
+                            style={{background:"none",border:"none",color:"#ef444466",cursor:"pointer",
+                              fontSize:14,padding:"0 2px",lineHeight:1,flexShrink:0}}>×</button>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...stageGroups].reverse().map(g=>{
+                    const stg=stages.find(s=>s.groupId===g.id);
+                    const c=stg?.color||"#475569";
+                    return (
+                      <React.Fragment key={g.id}>
+                        {["from","to"].map((field,fi)=>(
+                          <tr key={field}>
+                            <td style={{padding:"3px 12px",
+                              position:"sticky",left:0,zIndex:2,
+                              background:"#1e293b",
+                              borderLeft:`3px solid ${fi===0?c:c+"44"}`,
+                              borderRight:"2px solid #334155",
+                              borderBottom:fi===1?"1px solid #334155":"none",
+                              whiteSpace:"nowrap"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                                <span style={{fontSize:11,
+                                  fontWeight:fi===0?700:400,
+                                  color:fi===0?c:"#334155"}}>
+                                  {fi===0?g.label:""}
+                                </span>
+                                <span style={{fontSize:10,fontWeight:700,flexShrink:0,
+                                  color:fi===0?"#94a3b8":"#475569",
+                                  background:"#0f172a",borderRadius:3,padding:"1px 5px"}}>
+                                  {fi===0?"С":"ПО"}
+                                </span>
+                              </div>
+                            </td>
+                            {projSeries.map(ser=>{
+                              const r=(ser.stageRanges||{})[g.id]||{};
+                              const val=r[field]||"";
+                              function setVal(v){
+                                const old=ser.stageRanges||{};
+                                const nr={...old,[g.id]:{...(old[g.id]||{}),[field]:v}};
+                                onBatchUpdate({series:(data.series||[]).map(s=>s.id===ser.id?{...s,stageRanges:nr}:s),tasks:data.tasks});
+                              }
+                              return (
+                                <td key={ser.id} style={{padding:"1px 3px",
+                                  borderLeft:"1px solid #0f172a",
+                                  borderBottom:fi===1?"1px solid #1e293b":"none",
+                                  background:val?`${c}0d`:"transparent"}}>
+                                  <input type="date"
+                                    value={toInput(val)}
+                                    onChange={e=>setVal(fromInput(e.target.value))}
+                                    style={{background:"transparent",border:"none",
+                                      color:val?"#e2e8f0":"#1e293b",fontSize:11,
+                                      outline:"none",width:108,cursor:"pointer",
+                                      fontFamily:"inherit"}}/>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
@@ -4306,6 +4587,7 @@ function App(){
   const [navState,setNavState]=useState(()=>parseHash());
   const [syncState,setSyncState]=useState("ok");
   const [dayShiftsModal,setDayShiftsModal]=useState(false);
+  const [ganttDay,setGanttDay]=useState(null);
   const saveTimer=useRef(null);
 
   useEffect(()=>{
@@ -4320,7 +4602,9 @@ function App(){
           return cloudSave(demo);
         }
         let migrated=false;
+        if(!record.roles||!record.roles.length){record.roles=DEMO_ROLES;migrated=true;}
         if(!record.stages||!record.stages.length){record.stages=DEFAULT_STAGES;migrated=true;}
+        if(!record.stageGroups||!record.stageGroups.length){record.stageGroups=DEFAULT_STAGE_GROUPS;migrated=true;}
         if(!record.holidays){record.holidays=DEFAULT_HOLIDAYS;migrated=true;}
         if(!record.series){
           record.series=[];
@@ -4362,6 +4646,11 @@ function App(){
         if((record.series||[]).some(s=>s.transitCode===undefined)){
           record.series=(record.series||[]).map(s=>s.transitCode!==undefined?s:
             {...s,transitCode:"",transitVariants:["","",""]});
+          migrated=true;
+        }
+        if((record.series||[]).some(s=>s.syncStart===undefined)){
+          record.series=(record.series||[]).map(s=>s.syncStart!==undefined?s:
+            {...s,syncStart:""});
           migrated=true;
         }
         setData(record);
@@ -4430,15 +4719,15 @@ function App(){
   }
 
   function deleteProject(projId){
-    if(!window.confirm("Удалить проект? Прошлые задачи сохранятся в истории.")) return;
-    const today=formatDate(new Date());
+    if(!window.confirm("Удалить проект? Задачи на сегодня и раньше сохранятся.")) return;
+    const todaySort=daySort(formatDate(new Date()));
     setData(d=>{
       pushHistory(d);
       const newData={
         ...d,
         projects:d.projects.filter(p=>p.id!==projId),
         series:(d.series||[]).filter(s=>s.projectId!==projId),
-        tasks:d.tasks.filter(t=>t.project!==projId||t.day<today),
+        tasks:d.tasks.filter(t=>t.project!==projId||daySort(t.day)<=todaySort),
       };
       doSave(newData);
       return newData;
@@ -4577,9 +4866,9 @@ function App(){
         ):(
         <>
         {view==="today"    &&<TodayView     data={data} conflictDetails={conflictDetails} onNavigateConflicts={()=>setView("conflicts")}/>}
-        {view==="projects" &&<ProjectsView  data={data} onUpdate={updateData} onBatchUpdate={batchUpdate} onDeleteProject={deleteProject} onProjectSelect={id=>navigate({type:"project",id})}/>}
-        {view==="calendar" &&<CalendarView  data={data}/>}
-        {view==="gantt"    &&<GanttView     data={data} onUpdate={updateData} onSeriesSelect={id=>navigate({type:"series",id})}/>}
+        {view==="projects" &&<ProjectsView  data={data} onUpdate={updateData} onBatchUpdate={batchUpdate} onDeleteProject={deleteProject} onProjectSelect={id=>navigate({type:"project",id})} onSeriesSelect={id=>navigate({type:"series",id})}/>}
+        {view==="calendar" &&<CalendarView  data={data} onGoToGantt={day=>{setGanttDay(day);setView("gantt");}}/>}
+        {view==="gantt"    &&<GanttView     data={data} onUpdate={updateData} onSeriesSelect={id=>navigate({type:"series",id})} startDay={ganttDay}/>}
         {view==="days"     &&<DaysView      data={data} conflictIds={conflictIds}/>}
         {view==="people"   &&<PeopleView    data={data} conflictIds={conflictIds} onPersonSelect={id=>navigate({type:"person",id})}/>}
         {view==="conflicts" &&<ConflictsView details={conflictDetails} data={data}/>}
