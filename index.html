@@ -102,11 +102,32 @@ const DEFAULT_HOLIDAYS = [
 ];
 
 const PALETTE = ["#3b82f6","#a855f7","#22c55e","#f59e0b","#ec4899","#ef4444","#14b8a6","#f97316","#06b6d4","#84cc16"];
+const ASSET_STAGES=[
+  {id:"ingest",   label:"Инжест",    color:"#64748b"},
+  {id:"sync",     label:"Синхра",    color:"#ec4899"},
+  {id:"edit",     label:"Редактура", color:"#a855f7"},
+  {id:"montage",  label:"Монтаж",    color:"#3b82f6"},
+  {id:"color",    label:"Цвет",      color:"#f59e0b"},
+  {id:"sound",    label:"Звук",      color:"#06b6d4"},
+  {id:"master",   label:"Мастер",    color:"#22c55e"},
+  {id:"delivered",label:"Сдан",      color:"#10b981"},
+];
+function makeAsset(id){
+  return {
+    id,label:"",stage:"ingest",
+    paths:{ingest:"",sync:"",project:"",master:"",delivery:""},
+    history:[],
+    timings:{ingestAt:"",syncAt:"",editAt:"",colorAt:"",soundAt:"",masterAt:"",deliveredAt:""},
+    thumb:"",
+    qc:{status:null,checks:[]},
+    ai:{estimatedDays:null,deadlineRisk:null,diskWarning:null,suggestedNextStep:null,notes:""},
+  };
+}
 const SERIES_MILESTONES=[
   {key:"sendDate",   label:"Отправка заказчику", abbr:"→К",   color:"#a855f7"},
   {key:"preOtkDate", label:"Пред-ОТК",           abbr:"пОТК", color:"#0ea5e9"},
   {key:"otkDate",    label:"ОТК",                abbr:"ОТК",  color:"#22c55e"},
-  {key:"airDate",    label:"Эфир",               abbr:"ЭФ",   color:"#f59e0b"},
+  {key:"airDate",    label:"Эфир",               abbr:"Эфир", color:"#ef4444"},
 ];
 const GANTT_TEMPLATES=[
   {status:"синхра",        label:"Синхра"},
@@ -133,6 +154,8 @@ const DEFAULT_STAGE_GROUPS = [
   {id:"sg10",label:"Архив",               order:10},
 ];
 function daySort(s){return s?s.split('.').reverse().join(''):'';}
+function fmtHour(h){const n=Number(h)||0;return `${Math.floor(n)}:${n%1>=0.5?"30":"00"}`;}
+function fmtDur(f,t){const d=Number(t)-Number(f);if(d<=0)return "";const h=Math.floor(d);return d%1>=0.5?`${h}ч 30мин`:`${h}ч`;}
 
 // ── ДЕМО ДАННЫЕ ──────────────────────────────────────────────────────
 const DEMO_ROLES = [
@@ -338,26 +361,54 @@ const DEMO_CSV = `проект,серия,статус,кто,день,с,до,�
 Морской Берег,С03,предотк,Кириллов,24.03.2026,10,13,
 Морской Берег,С04,монтаж,Кузнецова,24.03.2026,10,18,`;
 
-// ── ОБЛАКО (JSONBin) ─────────────────────────────────────────────────
-const BIN_ID  = "69e75692856a682189586423";
-const API_KEY = "$2a$10$8zX41cC.twLtnZUKomTcfOhKXx.jgl/HegcsMT537ONAeI7qda3n2";
-const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+// ── ХРАНИЛИЩЕ ДАННЫХ ─────────────────────────────────────────────────
+//
+//  STORAGE_MODE:
+//    "jsonbin" — текущий режим, облако jsonbin.io (временно)
+//    "server"  — собственный сервер + PostgreSQL (поменяйте когда айтишник настроит)
+//
+const STORAGE_MODE = "jsonbin"; // ← ПОМЕНЯТЬ НА "server" ПОСЛЕ НАСТРОЙКИ
+
+//  SERVER_URL — адрес вашего сервера.
+//  Если браузер открывает страницу с того же сервера — оставьте "".
+//  Если разработка на отдельной машине — укажите, например: "http://192.168.1.50:3000"
+const SERVER_URL = "";
+
+// JSONBin (только пока STORAGE_MODE = "jsonbin")
+const _BIN_ID  = "69e75692856a682189586423";
+const _API_KEY = "$2a$10$8zX41cC.twLtnZUKomTcfOhKXx.jgl/HegcsMT537ONAeI7qda3n2";
 
 async function cloudLoad() {
-  const res = await fetch(`${API_URL}/latest`, {
-    headers: {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"},
+  if (STORAGE_MODE === "server") {
+    const res = await fetch(`${SERVER_URL}/api/data`);
+    if (!res.ok) throw new Error(`Сервер ответил ${res.status}`);
+    return await res.json();
+  }
+  // JSONBin
+  const res = await fetch(`https://api.jsonbin.io/v3/b/${_BIN_ID}/latest`, {
+    headers: {"X-Master-Key": _API_KEY, "X-Bin-Meta": "false"},
   });
-  if (!res.ok) throw new Error("load failed");
+  if (!res.ok) throw new Error("JSONBin load failed");
   return await res.json();
 }
 
 async function cloudSave(data) {
-  const res = await fetch(API_URL, {
+  if (STORAGE_MODE === "server") {
+    const res = await fetch(`${SERVER_URL}/api/data`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Сервер ответил ${res.status}`);
+    return;
+  }
+  // JSONBin
+  const res = await fetch(`https://api.jsonbin.io/v3/b/${_BIN_ID}`, {
     method: "PUT",
-    headers: {"X-Master-Key": API_KEY, "Content-Type": "application/json"},
+    headers: {"X-Master-Key": _API_KEY, "Content-Type": "application/json"},
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("save failed");
+  if (!res.ok) throw new Error("JSONBin save failed");
 }
 
 // ── SEED ─────────────────────────────────────────────────────────────
@@ -553,12 +604,14 @@ function filterPeopleByStatus(people, status, stages){
 function getConflicts(tasks,people,stages){
   const ids=new Set(); const details=[];
   const byPD={};
-  tasks.forEach(t=>{
+  tasks.filter(t=>!((stages||[]).find(s=>s.id===t.status)?.noImpact)).forEach(t=>{
     const k=t.person+"||"+t.day;
     if(!byPD[k]) byPD[k]=[];
     byPD[k].push(t);
   });
   Object.values(byPD).forEach(group=>{
+    const personObj=(people||[]).find(p=>p.name===group[0]?.person);
+    if(personObj?.allowParallel) return;
     for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++){
       const a=group[i],b=group[j];
       const af=a.from||0,at=a.to||0,bf=b.from||0,bt=b.to||0;
@@ -576,6 +629,7 @@ function getConflicts(tasks,people,stages){
       if(!t.person) return;
       const stage=(stages||[]).find(s=>s.id===t.status);
       if(!stage||!stage.rolesRequired||!stage.rolesRequired.length) return;
+      if(stage.noImpact) return;
       const person=(people||[]).find(p=>p.name===t.person);
       if(!person) return;
       const personRoles=person.roles||[];
@@ -815,26 +869,28 @@ function StatusBadge({s,small}){
   );
 }
 
-function TaskCard({task,projects,isConflict,onClick,onHover}){
+function TaskCard({task,projects,isConflict,onClick,onHover,large}){
   const color=projColor(projects,task.project);
-  const pname=projAbbr(projects,task.project);
+  const pname=large?projAbbr(projects,task.project):projName(projects,task.project);
   return (
     <div onClick={onClick}
       onMouseEnter={onHover?e=>onHover(task,e.currentTarget.getBoundingClientRect()):undefined}
       onMouseLeave={onHover?()=>onHover(null):undefined}
-      style={{borderLeft:`3px solid ${isConflict?"#ef4444":color}`,
-        background:isConflict?"rgba(239,68,68,0.07)":"rgba(255,255,255,0.03)",
+      style={{position:"relative",borderLeft:`3px solid ${task.cancelled?"#334155":isConflict?"#ef4444":color}`,
+        background:task.cancelled?"rgba(15,23,42,0.4)":isConflict?"rgba(239,68,68,0.07)":"rgba(255,255,255,0.03)",
         borderRadius:"0 6px 6px 0",padding:"5px 8px",marginBottom:4,
-        cursor:onClick?"pointer":"default"}}>
-      <div style={{fontWeight:700,color:isConflict?"#f87171":color,fontSize:11,marginBottom:2}}>
+        cursor:onClick?"pointer":"default",opacity:task.cancelled?0.4:1}}>
+      {task.cancelled&&<span style={{position:"absolute",top:3,right:5,fontSize:10,opacity:0.7}}>🚫</span>}
+      <div style={{fontWeight:700,color:task.cancelled?"#334155":isConflict?"#f87171":color,fontSize:11,marginBottom:2,
+        textDecoration:task.cancelled?"line-through":"none"}}>
         {isConflict&&"⚡ "}{task.series}
-        {task.unplanned&&<span style={{color:"#f97316",marginLeft:4,fontSize:9}}>⚠внеплан</span>}
-        <span style={{fontWeight:400,color:"#475569",marginLeft:5,fontSize:10}}>{pname}</span>
+        {task.unplanned&&!task.cancelled&&<span style={{color:"#f97316",marginLeft:4,fontSize:9}}>⚠внеплан</span>}
+        <span style={{fontWeight:400,color:"#475569",marginLeft:5,fontSize:large?12:10}}>{pname}</span>
       </div>
       {task.note&&<div style={{color:"#94a3b8",fontSize:10,lineHeight:1.3,marginBottom:3}}>{task.note}</div>}
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         <StatusBadge s={task.status} small/>
-        <span style={{color:"#475569",fontSize:10}}>{task.from}:00–{task.to}:00</span>
+        <span style={{color:large?"#94a3b8":"#475569",fontSize:large?13:10,fontWeight:large?600:400}}>{fmtHour(task.from)}–{fmtHour(task.to)}</span>
       </div>
     </div>
   );
@@ -865,7 +921,7 @@ function TaskTooltip({task,rect,projects}){
       </div>}
       {task.person&&<div style={{fontSize:12,color:"#cbd5e1",marginBottom:3}}>{task.person}</div>}
       <div style={{fontSize:11,color:"#64748b",marginBottom:task.note?4:0}}>
-        {task.from}:00 – {task.to}:00 · {(task.to||0)-(task.from||0)} ч
+        {fmtHour(task.from)} – {fmtHour(task.to)} · {fmtDur(task.from,task.to)}
         {task.unplanned&&<span style={{color:"#f97316",marginLeft:6}}>⚠ внеплан</span>}
       </div>
       {task.note&&<div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4,marginTop:4,borderTop:"1px solid #334155",paddingTop:4}}>{task.note}</div>}
@@ -934,6 +990,17 @@ function StageEditModal({stage,roles,stageGroups,onSave,onClose}){
             style={{accentColor:"#22c55e"}}/>
           <span style={{fontSize:13}}>Исполнитель обязателен</span>
         </label>
+      </Field>
+      <Field label="Влияние на нагрузку">
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+          <input type="checkbox" checked={form.noImpact===true}
+            onChange={e=>setForm(f=>({...f,noImpact:e.target.checked}))}
+            style={{accentColor:"#f97316"}}/>
+          <span style={{fontSize:13}}>Без влияния — не считать в сменах и конфликтах</span>
+        </label>
+        {form.noImpact&&<div style={{fontSize:11,color:"#f97316",marginTop:4,opacity:0.8}}>
+          Этап нужен для планирования, но не учитывается в аналитике и не создаёт конфликтов
+        </div>}
       </Field>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
         <Btn variant="ghost" onClick={onClose}>Отмена</Btn>
@@ -1135,6 +1202,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
               <div style={{flex:1}}>
                 <span style={{fontSize:13,fontWeight:600}}>{stage.label}</span>
                 {!stage.needsExecutor&&<span style={{fontSize:9,color:"#64748b",marginLeft:6}}>без исполнителя</span>}
+                {stage.noImpact&&<span style={{fontSize:9,color:"#f97316",marginLeft:6,background:"rgba(249,115,22,0.1)",borderRadius:3,padding:"1px 4px"}}>без влияния</span>}
                 {(()=>{
                   const knownRoles=(stage.rolesRequired||[]).filter(rid=>roles.find(r=>r.id===rid));
                   const missing=(stage.rolesRequired||[]).filter(rid=>!roles.find(r=>r.id===rid));
@@ -1160,11 +1228,6 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
             </div>
             );
           })}
-          <div style={{marginTop:12}}>
-            <Btn variant="ghost" onClick={()=>onUpdate("stages",DEFAULT_STAGES)}>
-              ↺ Сбросить к умолчаниям
-            </Btn>
-          </div>
         </div>
       )}
 
@@ -1215,9 +1278,6 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
             <span style={{fontSize:14,fontWeight:700,color:"#93c5fd"}}>
               Нерабочие дни ({holidays.length})
             </span>
-            <Btn variant="ghost" onClick={()=>onUpdate("holidays",DEFAULT_HOLIDAYS)}>
-              ↺ Сбросить к умолчаниям
-            </Btn>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:16}}>
             <input type="date"
@@ -1281,7 +1341,7 @@ function DirectoryView({data,onUpdate,onBatchUpdate}){
 }
 
 function PersonModal({person,roles,onSave,onDelete,onClose}){
-  const [form,setForm]=useState({name:person.name||"",roles:[...(person.roles||[])],active:person.active!==false});
+  const [form,setForm]=useState({name:person.name||"",roles:[...(person.roles||[])],active:person.active!==false,allowParallel:person.allowParallel===true});
   const isNew=!person.id;
   function toggleRole(id){setForm(f=>({...f,roles:f.roles.includes(id)?f.roles.filter(r=>r!==id):[...f.roles,id]}));}
   function handleSave(){if(!form.name.trim()){alert("Введите имя");return;}onSave({...person,...form});}
@@ -1309,6 +1369,13 @@ function PersonModal({person,roles,onSave,onDelete,onClose}){
           <span style={{fontSize:13}}>Активный сотрудник</span>
         </label>
       </Field>
+      <Field label="Конфликты">
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+          <input type="checkbox" checked={form.allowParallel} onChange={e=>setForm(f=>({...f,allowParallel:e.target.checked}))} style={{accentColor:"#a855f7"}}/>
+          <span style={{fontSize:13}}>Разрешить параллельные задачи</span>
+        </label>
+        {form.allowParallel&&<div style={{fontSize:11,color:"#a855f7",marginTop:4,opacity:0.8}}>Пересечения по времени не будут считаться конфликтами</div>}
+      </Field>
       <div style={{display:"flex",justifyContent:"space-between",marginTop:16}}>
         <div>{!isNew&&<Btn variant="danger" onClick={()=>onDelete(person.id)}>Удалить</Btn>}</div>
         <div style={{display:"flex",gap:8}}>
@@ -1328,6 +1395,8 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
   const [archFilter,setArchFilter]=useState("все");
   const [hoveredProj,setHoveredProj]=useState(null);
   const [hoveredSer,setHoveredSer]=useState(null);
+  const [collapsed,setCollapsed]=useState(new Set());
+  const serDragRef=useRef(null);
 
   function saveProject(proj){
     let projects=[...data.projects];
@@ -1377,23 +1446,24 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
               upcoming.push({ser,proj,type:m.label,date,color:m.color});
           });
         });
-        upcoming.sort((a,b)=>daySort(a.date)-daySort(b.date));
+        upcoming.sort((a,b)=>daySort(a.date).localeCompare(daySort(b.date)));
         if(!upcoming.length) return null;
         const daysDiff=ds=>{const d=parseDate(ds);if(!d)return"";const diff=Math.round((d-todayD)/(86400000));return diff===0?"сегодня":diff===1?"завтра":`через ${diff} дн.`;};
         return (
           <div style={{marginBottom:16,padding:"10px 14px",background:"rgba(239,68,68,0.05)",
-            border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{fontSize:11,color:"#f87171",fontWeight:700,marginRight:4}}>🔴 Дедлайны (7 дней)</span>
-            {upcoming.map((u,i)=>(
-              <span key={i} onClick={()=>setDirectEditSeries({ser:u.ser,proj:u.proj})}
-                style={{background:`${u.color}22`,border:`1px solid ${u.color}44`,borderRadius:6,
-                  padding:"3px 10px",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                <span style={{width:6,height:6,borderRadius:"50%",background:u.proj.color,flexShrink:0,display:"inline-block"}}/>
-                <span style={{color:"#e2e8f0"}}>{u.proj.abbr||u.proj.name} {u.ser.name}</span>
-                <span style={{color:u.color,fontWeight:700}}>{u.type}</span>
-                <span style={{color:"#475569"}}>{daysDiff(u.date)}</span>
-              </span>
-            ))}
+            border:"1px solid rgba(239,68,68,0.2)",borderRadius:8}}>
+            <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginBottom:8}}>🔴 Дедлайны — ближайшие 7 дней</div>
+            <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
+              {upcoming.map((u,i)=>(
+                <div key={i} onClick={()=>setDirectEditSeries({ser:u.ser,proj:u.proj})}
+                  style={{background:`${u.color}18`,border:`1px solid ${u.color}55`,borderRadius:8,
+                    padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0,minWidth:110}}>
+                  <div style={{color:u.color,fontWeight:700,fontSize:10,marginBottom:2}}>{u.type}</div>
+                  <div style={{color:"#e2e8f0",fontWeight:600}}>{u.proj.abbr||u.proj.name} {u.ser.name}</div>
+                  <div style={{color:"#64748b",fontSize:10,marginTop:2}}>{u.date} · {daysDiff(u.date)}</div>
+                </div>
+              ))}
+            </div>
           </div>
         );
       })()}
@@ -1450,24 +1520,35 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
                   </div>
                   {proj.description&&<div style={{fontSize:12,color:"#64748b",marginBottom:6}}>{proj.description}</div>}
                   <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-                    <span style={{fontSize:11,background:"rgba(255,255,255,0.06)",
-                      border:"1px solid #334155",borderRadius:4,padding:"2px 8px",color:"#94a3b8"}}>
-                      {projSeries.length} {projSeries.length===1?"серия":projSeries.length>=2&&projSeries.length<=4?"серии":"серий"}
-                    </span>
+                    <button onClick={e=>{e.stopPropagation();setCollapsed(s=>{const n=new Set(s);n.has(proj.id)?n.delete(proj.id):n.add(proj.id);return n;})}}
+                      style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"#94a3b8",
+                        padding:0,display:"flex",alignItems:"center",gap:4}}>
+                      <span>{collapsed.has(proj.id)?"▶":"▼"}</span>
+                      <span style={{background:"rgba(255,255,255,0.06)",border:"1px solid #334155",
+                        borderRadius:4,padding:"2px 8px"}}>
+                        {projSeries.length} {projSeries.length===1?"серия":projSeries.length>=2&&projSeries.length<=4?"серии":"серий"}
+                      </span>
+                    </button>
                     <span style={{fontSize:11,color:"#475569"}}>{pTasks.length} задач</span>
                     {proj.manager&&<span style={{fontSize:11,color:"#475569"}}>
                       <span style={{color:"#334155"}}>Менеджер: </span>{proj.manager}
                     </span>}
-                    <span style={{fontSize:11,color:"#334155",marginLeft:"auto"}}>двойной клик →</span>
+                    <button onClick={e=>{e.stopPropagation();setDirectEditSeries({ser:{name:"",shootStart:"",editStart:"",preOtkDate:"",otkDate:"",airMode:"weekly",airDay:1,airTime:"21:00",syncStart:""},proj});}}
+                      style={{marginLeft:"auto",background:"#3b82f622",border:"1px solid #3b82f655",
+                        borderRadius:4,color:"#3b82f6",fontSize:11,padding:"2px 10px",
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      + Серия
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {projSeries.length>0&&(
+              {projSeries.length>0&&!collapsed.has(proj.id)&&(
                 <div style={{padding:"0 18px 14px",display:"grid",
                   gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:6}}>
                   {projSeries.map(ser=>{
-                    const sTasks=pTasks.filter(t=>t.series===ser.name);
+                    const todayStr=formatDate(new Date());
+                    const sTasks=pTasks.filter(t=>t.series===ser.name&&daySort(t.day)<=daySort(todayStr));
                     const maxStageIdx=Math.max(...sTasks.map(t=>stages.findIndex(s=>s.id===t.status)).filter(x=>x>=0),-1);
                     const autoStage=maxStageIdx>=0?stages[maxStageIdx]:null;
                     const autoGroupId=autoStage?.groupId||"";
@@ -1485,11 +1566,27 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
                     }
                     return (
                       <div key={ser.id}
+                        draggable
+                        onDragStart={e=>{e.stopPropagation();serDragRef.current={id:ser.id,projId:proj.id};e.dataTransfer.effectAllowed="move";}}
+                        onDragOver={e=>{e.preventDefault();e.stopPropagation();}}
+                        onDrop={e=>{
+                          e.preventDefault();e.stopPropagation();
+                          const src=serDragRef.current;
+                          if(!src||src.projId!==proj.id||src.id===ser.id) return;
+                          const arr=[...projSeries];
+                          const si=arr.findIndex(s=>s.id===src.id),ti=arr.findIndex(s=>s.id===ser.id);
+                          if(si===-1||ti===-1) return;
+                          const [item]=arr.splice(si,1);arr.splice(ti,0,item);
+                          const others=(data.series||[]).filter(s=>s.projectId!==proj.id);
+                          onBatchUpdate({series:[...others,...arr.map((s,i)=>({...s,order:i}))],tasks:data.tasks});
+                          serDragRef.current=null;
+                        }}
+                        onDragEnd={()=>{serDragRef.current=null;}}
                         onDoubleClick={e=>{e.stopPropagation();onSeriesSelect?onSeriesSelect(ser.id):setDirectEditSeries({ser,proj});}}
                         onMouseEnter={()=>setHoveredSer(ser.id)}
                         onMouseLeave={()=>setHoveredSer(null)}
-                        title={onSeriesSelect?"Двойной клик — открыть серию":"Двойной клик — редактировать серию"}
-                        style={{background:hoveredSer===ser.id?"#1a2a3a":"#0f172a",cursor:"pointer",
+                        title="Перетащить — изменить порядок · Двойной клик — открыть"
+                        style={{background:hoveredSer===ser.id?"#1a2a3a":"#0f172a",cursor:"grab",
                           borderTop:`2px solid ${borderColor}`,
                           border:hoveredSer===ser.id?`1px solid ${borderColor}55`:"1px solid transparent",
                           borderTopColor:borderColor,
@@ -1498,7 +1595,10 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
                           transition:"background 0.15s,border-color 0.15s"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <span style={{fontWeight:700,fontSize:12}}>{ser.name}</span>
-                          {isManual&&<span title="Статус задан вручную" style={{fontSize:9,color:"#f59e0b"}}>🔒</span>}
+                          <span style={{display:"flex",alignItems:"center",gap:4}}>
+                            {isManual&&<span title="Статус задан вручную" style={{fontSize:9,color:"#f59e0b"}}>🔒</span>}
+                            <span style={{fontSize:9,color:"#334155",cursor:"grab"}}>⠿</span>
+                          </span>
                         </div>
                         <span style={{fontSize:11,fontWeight:700,
                           background:displayGroup?`${borderColor}22`:"#1e293b",
@@ -1542,8 +1642,20 @@ function ProjectsView({data,onUpdate,onBatchUpdate,onDeleteProject,onProjectSele
       {directEditSeries&&(
         <SeriesModal series={directEditSeries.ser} project={directEditSeries.proj} data={data}
           onSave={ser=>{
-            const updSeries=(data.series||[]).map(s=>s.id===ser.id?ser:s);
-            onBatchUpdate({series:updSeries,tasks:data.tasks});
+            let allS=[...(data.series||[])];
+            const isNew=!ser.id||!allS.find(s=>s.id===ser.id);
+            let newTasks=data.tasks;
+            if(isNew){
+              const final={...ser,id:"s"+Date.now(),projectId:directEditSeries.proj.id,
+                order:allS.filter(s=>s.projectId===directEditSeries.proj.id).length,
+                checklists:[],notes:"",delivered:false,deliveredAt:"",assets:[],
+                transitCode:"",transitVariants:["","",""],syncStart:ser.syncStart||""};
+              allS.push(final);
+              newTasks=generateAutoTasks(final,data.tasks);
+            } else {
+              allS=allS.map(s=>s.id===ser.id?ser:s);
+            }
+            onBatchUpdate({series:allS,tasks:newTasks});
             setDirectEditSeries(null);
           }}
           onClose={()=>setDirectEditSeries(null)}/>
@@ -1638,7 +1750,7 @@ function SeriesListModal({project,data,onSave,onClose}){
     } else {
       final={...serData,id:"s"+Date.now(),order:allS.filter(s=>s.projectId===project.id).length,
         transitCode:serData.transitCode||"",transitVariants:serData.transitVariants||["","",""],
-        checklists:[],notes:"",delivered:false,deliveredAt:""};
+        checklists:[],notes:"",delivered:false,deliveredAt:"",assets:[]};
       allS.push(final);
     }
     const isNew=!serData.id;
@@ -1950,18 +2062,24 @@ function CalendarView({data,onGoToGantt}){
           {selTasks.length===0&&selAirs.length===0&&selMil.length===0&&(
             <div style={{color:"#334155",fontSize:12}}>Нет событий</div>
           )}
-          {[...new Set(selTasks.map(t=>t.person))].map(person=>(
-            <div key={person} style={{marginBottom:10}}>
-              <div style={{fontSize:10,color:"#475569",letterSpacing:1,marginBottom:4}}>{person.toUpperCase()}</div>
-              {selTasks.filter(t=>t.person===person).map(t=>(
-                <div key={t.id} onDoubleClick={()=>onGoToGantt&&onGoToGantt(t.day)}
-                  title={onGoToGantt?"Двойной клик — открыть в Ганте":undefined}>
-                  <TaskCard task={t} projects={data.projects}
-                    onHover={(tk,r)=>setHovDay(tk?{task:tk,rect:r,single:true}:null)}/>
+          {[...new Set(selTasks.map(t=>t.person||"\x00"))].map(pkey=>{
+            const isEmpty=pkey==="\x00";
+            const personTasks=selTasks.filter(t=>(t.person||"\x00")===pkey);
+            return (
+              <div key={pkey} style={{marginBottom:10}}>
+                <div style={{fontSize:10,color:isEmpty?"#334155":"#475569",letterSpacing:1,marginBottom:4,fontStyle:isEmpty?"italic":"normal"}}>
+                  {isEmpty?"без исполнителя":pkey.toUpperCase()}
                 </div>
-              ))}
-            </div>
-          ))}
+                {personTasks.map(t=>(
+                  <div key={t.id} onDoubleClick={()=>onGoToGantt&&onGoToGantt(t.day)}
+                    title={onGoToGantt?"Двойной клик — открыть в Ганте":undefined}>
+                    <TaskCard task={t} projects={data.projects}
+                      onHover={(tk,r)=>setHovDay(tk?{task:tk,rect:r,single:true}:null)}/>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
       {hovDay&&!hovDay.single&&(
@@ -2025,7 +2143,7 @@ function GanttTooltip({task,tasks,rect,stageMap}){
         </div>}
         {t.person&&<div style={{fontSize:13,color:"#e2e8f0",marginBottom:4,fontWeight:600}}>{t.person}</div>}
         <div style={{fontSize:11,color:"#64748b",marginBottom:t.note?4:0}}>
-          {t.from}:00 – {t.to}:00 · {(t.to||0)-(t.from||0)} ч
+          {fmtHour(t.from)} – {fmtHour(t.to)} · {fmtDur(t.from,t.to)}
         </div>
         {t.note&&<div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4,marginTop:4}}>{t.note}</div>}
       </div>
@@ -2085,7 +2203,7 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
   useEffect(()=>{sessionStorage.setItem("ganttWeek",String(weekOffset));},[weekOffset]);
 
   useEffect(()=>{
-    function h(){setTaskModal({});}
+    function h(e){setTaskModal(e.detail||{});}
     window.addEventListener("gantt-new-task",h);
     return ()=>window.removeEventListener("gantt-new-task",h);
   },[]);
@@ -2162,10 +2280,18 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
       if(e.key==="ArrowRight") setWeekOffset(w=>w+1);
       else if(e.key==="ArrowLeft") setWeekOffset(w=>w-1);
+      else if(e.key==="Delete"||e.key==="Backspace"){
+        setSelectedTasks(sel=>{
+          if(sel.size===0) return sel;
+          if(!window.confirm(`Удалить ${sel.size} задач${sel.size===1?"у":sel.size<5?"и":""}?`)) return sel;
+          onUpdate("tasks",data.tasks.filter(t=>!sel.has(t.id)));
+          return new Set();
+        });
+      }
     }
     document.addEventListener("keydown",onKey);
     return()=>document.removeEventListener("keydown",onKey);
-  },[]);
+  },[data.tasks]);
 
   function handleProjDragStart(e,projId){
     projDragRef.current=projId;
@@ -2217,6 +2343,8 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
       if(task.id&&tasks.find(t=>t.id===task.id)) tasks=tasks.map(t=>t.id===task.id?task:t);
       else tasks.push({...task,id:genId(data.tasks)});
     }
+    const now=new Date().toISOString();
+    tasks=tasks.map(t=>t.id===task.id?{...t,updatedAt:now,updatedBy:""}:t);
     saveWithSeries(tasks, task.seriesId, task.status);
     setTaskModal(null);
   }
@@ -2414,7 +2542,7 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                     <div style={{width:9,height:9,borderRadius:2,background:proj.color,flexShrink:0}}/>
                     <span style={{fontWeight:700,fontSize:isCollapsed?11:12,color:"#94a3b8",flex:1,
                       overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
-                      {proj.abbr||proj.name}
+                      {proj.name}
                     </span>
                     {isCollapsed&&<span style={{fontSize:9,color:"#475569",flexShrink:0,marginRight:2}}>
                       {allSeries.length} сер.
@@ -2436,7 +2564,7 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                   const isDelivered=!!(ser.delivered);
 
                   return (
-                    <div key={serKey} style={{display:"flex",minHeight:rowH,height:isExpanded?"auto":rowH,
+                    <div key={serKey} style={{display:"flex",minHeight:rowH,height:"auto",
                       background:si%2===0?"#0a1220":"#060d1a",
                       borderBottom:"1px solid #1e293b",
                       opacity:isDelivered?0.5:1,alignItems:"stretch"}}>
@@ -2505,7 +2633,7 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                             style={{width:COL,flexShrink:0,
                               borderLeft:isMon?"2px solid #334155":"1px solid #1e293b",
                               padding:2,display:"flex",flexDirection:"column",gap:1,
-                              cursor:"pointer",overflow:"hidden",
+                              cursor:"pointer",overflow:"visible",
                               background:isInLasso?"rgba(59,130,246,0.18)":(isToday?"rgba(59,130,246,0.06)":"transparent"),
                               transition:"background 0.1s",userSelect:"none"}}>
                             {isRealSer&&SERIES_MILESTONES.filter(m=>ser[m.key]===d).map(m=>(
@@ -2531,13 +2659,16 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                                     onClick={e=>{e.stopPropagation();if(e.shiftKey){setSelectedTasks(prev=>{const n=new Set(prev);n.has(t.id)?n.delete(t.id):n.add(t.id);return n;});}else{setTaskModal(t);}}}
                                     onMouseEnter={e=>{e.stopPropagation();setHoverTask({task:t,rect:e.currentTarget.getBoundingClientRect()});}}
                                     onMouseLeave={e=>{e.stopPropagation();setHoverTask(null);}}
-                                    style={{background:isSel?`${st?.color||"#3b82f6"}33`:st?stageBg(st.color):"rgba(255,255,255,0.08)",
-                                      border:isSel?`2px solid ${st?.color||"#3b82f6"}`:`1px solid ${st?stageBorder(st.color):"#334155"}`,
-                                      borderLeft:`3px solid ${grpColor||proj.color}`,
+                                    style={{position:"relative",
+                                      background:t.cancelled?"rgba(71,85,105,0.12)":isSel?`${st?.color||"#3b82f6"}33`:st?stageBg(st.color):"rgba(255,255,255,0.08)",
+                                      border:t.cancelled?"1px dashed #475569":isSel?`2px solid ${st?.color||"#3b82f6"}`:`1px solid ${st?stageBorder(st.color):"#334155"}`,
+                                      borderLeft:`3px solid ${t.cancelled?"#475569":grpColor||proj.color}`,
                                       borderRadius:3,flexShrink:0,overflow:"hidden",
-                                      color:st?st.color:"#94a3b8",cursor:"grab",userSelect:"none",padding:"3px 5px"}}>
+                                      color:t.cancelled?"#64748b":st?st.color:"#94a3b8",
+                                      cursor:"grab",userSelect:"none",padding:"3px 5px"}}>
+                                    {t.cancelled&&<span style={{position:"absolute",top:1,right:2,fontSize:7,lineHeight:1}}>🚫</span>}
                                     <div style={{fontSize:9,lineHeight:1.4}}>
-                                      <div style={{fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{st?.abbr||st?.label||t.status}</div>
+                                      <div style={{fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textDecoration:t.cancelled?"line-through":"none"}}>{st?.abbr||st?.label||t.status}</div>
                                       <div style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",opacity:0.85}}>{t.person||"—"}</div>
                                       <div style={{fontSize:8,opacity:0.6}}>{t.from}–{t.to}</div>
                                     </div>
@@ -2545,10 +2676,12 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                                 );
                               })
                             ):(()=>{
-                              // Collapsed: group by status
+                              // Collapsed: group active by status, cancelled separately
+                              const activeCT=cellTasks.filter(t=>!t.cancelled);
+                              const cancelledCnt=cellTasks.length-activeCT.length;
                               const groups={};
-                              cellTasks.forEach(t=>{if(!groups[t.status])groups[t.status]=[];groups[t.status].push(t);});
-                              return Object.entries(groups).map(([status,grpTasks])=>{
+                              activeCT.forEach(t=>{if(!groups[t.status])groups[t.status]=[];groups[t.status].push(t);});
+                              const badges=Object.entries(groups).map(([status,grpTasks])=>{
                                 const st=stageMap[status];
                                 const grpColor=st?.groupId?groupColorMap[st.groupId]:undefined;
                                 const barColor=grpColor||proj.color;
@@ -2575,6 +2708,18 @@ function GanttView({data,onUpdate,onSeriesSelect,startDay}){
                                   </div>
                                 );
                               });
+                              if(cancelledCnt>0) badges.push(
+                                <div key="__c" style={{background:"rgba(71,85,105,0.15)",border:"1px dashed #475569",
+                                  borderLeft:"3px solid #475569",borderRadius:3,overflow:"hidden",
+                                  color:"#64748b",padding:"1px 3px",cursor:"pointer"}}
+                                  onClick={e=>{e.stopPropagation();const ct=cellTasks.filter(t=>t.cancelled);if(ct.length===1)setTaskModal(ct[0]);}}>
+                                  <div style={{fontSize:9,display:"flex",alignItems:"center",gap:1}}>
+                                    <span>🚫</span>
+                                    {cancelledCnt>1&&<span style={{fontSize:8,fontWeight:800}}>×{cancelledCnt}</span>}
+                                  </div>
+                                </div>
+                              );
+                              return badges;
                             })()}
                           </div>
                         );
@@ -2702,14 +2847,36 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
             </Btn>
           ))}
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <span style={{fontSize:12,color:"#64748b"}}>с</span>
-          <Inp value={String(form.from)} onChange={v=>sf({from:parseInt(v)||0})}
-            type="number" min="0" max="24" style={{width:60}}/>
+          <select value={Math.floor(form.from||0)}
+            onChange={e=>sf({from:Number(e.target.value)+(((form.from||0)%1>=0.5)?0.5:0)})}
+            style={{background:"#0f172a",border:"1px solid #334155",color:"#e2e8f0",
+              borderRadius:6,padding:"5px 8px",fontSize:13,outline:"none"}}>
+            {Array.from({length:24},(_,i)=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
+          </select>
+          <select value={(form.from||0)%1>=0.5?30:0}
+            onChange={e=>sf({from:Math.floor(form.from||0)+Number(e.target.value)/60})}
+            style={{background:"#0f172a",border:"1px solid #334155",color:"#e2e8f0",
+              borderRadius:6,padding:"5px 8px",fontSize:13,outline:"none"}}>
+            <option value={0}>:00</option>
+            <option value={30}>:30</option>
+          </select>
           <span style={{fontSize:12,color:"#64748b"}}>до</span>
-          <Inp value={String(form.to)} onChange={v=>sf({to:parseInt(v)||0})}
-            type="number" min="0" max="24" style={{width:60}}/>
-          <span style={{fontSize:12,color:"#64748b"}}>{form.to-form.from>0?`${form.to-form.from}ч`:""}</span>
+          <select value={Math.floor(form.to||0)}
+            onChange={e=>sf({to:Number(e.target.value)+(((form.to||0)%1>=0.5)?0.5:0)})}
+            style={{background:"#0f172a",border:"1px solid #334155",color:"#e2e8f0",
+              borderRadius:6,padding:"5px 8px",fontSize:13,outline:"none"}}>
+            {Array.from({length:25},(_,i)=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
+          </select>
+          <select value={(form.to||0)%1>=0.5?30:0}
+            onChange={e=>sf({to:Math.floor(form.to||0)+Number(e.target.value)/60})}
+            style={{background:"#0f172a",border:"1px solid #334155",color:"#e2e8f0",
+              borderRadius:6,padding:"5px 8px",fontSize:13,outline:"none"}}>
+            <option value={0}>:00</option>
+            <option value={30}>:30</option>
+          </select>
+          <span style={{fontSize:12,color:"#64748b"}}>{fmtDur(form.from,form.to)}</span>
         </div>
       </Field>
       <Field label="Заметка">
@@ -2718,7 +2885,7 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
           style={{background:"#0f172a",border:"1px solid #334155",color:"#e2e8f0",
             borderRadius:6,padding:"7px 10px",fontSize:13,width:"100%",resize:"vertical"}}/>
       </Field>
-      <div style={{display:"flex",gap:16,marginBottom:6}}>
+      <div style={{display:"flex",gap:16,marginBottom:6,alignItems:"center",flexWrap:"wrap"}}>
         {hasTail&&(
           <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
             <input type="checkbox" checked={form.shifts_tail}
@@ -2726,7 +2893,30 @@ function TaskModal({task,data,onSave,onDelete,onClose}){
             <span style={{fontSize:13,color:"#f59e0b"}}>Сдвинуть весь хвост серии</span>
           </label>
         )}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+          {form.cancelled?(
+            <span style={{fontSize:11,color:"#475569",background:"rgba(71,85,105,0.15)",
+              border:"1px solid #475569",borderRadius:6,padding:"4px 10px"}}>🚫 Отменена</span>
+          ):(
+            <span style={{fontSize:11,color:"#94a3b8"}}>
+              {!isNew&&daySort(form.day)<daySort(formatDate(new Date()))?"✓ Выполнено":"◷ Запланировано"}
+            </span>
+          )}
+          {form.cancelled?(
+            <Btn small variant="ghost" onClick={()=>sf({cancelled:false,
+              note:(form.note||"").replace(/^ОТМЕНА\n?/,"").trim()})}>↩ Снять отмену</Btn>
+          ):(
+            <Btn small variant="danger" onClick={()=>sf({cancelled:true,
+              note:"ОТМЕНА"+(form.note?"\n"+form.note:"")})}>🚫 Отменить</Btn>
+          )}
+        </div>
       </div>
+      {task.updatedAt&&(
+        <div style={{fontSize:10,color:"#334155",marginTop:8,textAlign:"right"}}>
+          изменено: {new Date(task.updatedAt).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"})}
+          {task.updatedBy?" · "+task.updatedBy:""}
+        </div>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",marginTop:16}}>
         <div>{!isNew&&<Btn variant="danger" disabled={isLocked} onClick={()=>!isLocked&&onDelete(task.id)}>Удалить</Btn>}</div>
         <div style={{display:"flex",gap:8}}>
@@ -2747,7 +2937,7 @@ function DaysView({data,conflictIds}){
   const [filterProject,setFilterProject]=useState("");
   const [hovTask,setHovTask]=useState(null);
   const tasks=useMemo(()=>enrichTasks(data.tasks),[data.tasks]);
-  const people=useMemo(()=>[...new Set(tasks.map(t=>t.person))].sort(),[tasks]);
+  const people=useMemo(()=>[...new Set(tasks.map(t=>t.person).filter(Boolean))].filter(p=>data.people.some(dp=>dp.name===p)).sort(),[tasks,data.people]);
   const containerRef=useRef(null);
 
   useEffect(()=>{
@@ -2755,6 +2945,7 @@ function DaysView({data,conflictIds}){
     document.addEventListener("keydown",h);
     return()=>document.removeEventListener("keydown",h);
   },[]);
+  useEffect(()=>{const t=setTimeout(scrollToToday,150);return()=>clearTimeout(t);},[]);
 
   const filtered=useMemo(()=>{
     let r=tasks;
@@ -2785,23 +2976,33 @@ function DaysView({data,conflictIds}){
         </div>
         <div style={{background:"#1e293b",borderRadius:"0 0 6px 6px",border:"1px solid #334155",
           borderTop:"none",padding:compact?4:6,minHeight:compact?50:80}}>
-          {peopleCols.map(person=>{
-            const pt=dayTasks.filter(t=>t.person===person);
-            if(!pt.length) return null;
-            return (
-              <div key={person} style={{marginBottom:compact?4:6}}>
-                <div style={{fontSize:compact?8:9,color:"#475569",letterSpacing:1,marginBottom:2}}>{person.toUpperCase()}</div>
-                {pt.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
-              </div>
-            );
-          })}
+          {(()=>{
+            const visible=peopleCols.filter(p=>dayTasks.some(t=>t.person===p));
+            const twoCol=!compact&&visible.length>4;
+            const items=visible.map(person=>{
+              const pt=dayTasks.filter(t=>t.person===person);
+              return (
+                <div key={person} style={{marginBottom:compact?4:8}}>
+                  <div style={{fontSize:compact?9:13,color:"#94a3b8",fontWeight:700,marginBottom:3}}>{person}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                    {pt.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} large onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
+                  </div>
+                </div>
+              );
+            });
+            return twoCol
+              ? <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,alignItems:"start"}}>{items}</div>
+              : items;
+          })()}
           {!dayTasks.length&&<div style={{color:"#334155",fontSize:11}}>нет задач</div>}
         </div>
       </div>
     );
   }
 
-  const dayKeys=[...new Set(filtered.map(t=>t._dayKey))].sort((a,b)=>daySort(a).localeCompare(daySort(b)));
+  const dayKeys=[...new Set(filtered.map(t=>t._dayKey))]
+    .filter(dk=>filtered.some(t=>t._dayKey===dk&&peopleCols.includes(t.person)))
+    .sort((a,b)=>daySort(a).localeCompare(daySort(b)));
   const groups={};
   if(groupBy!=="day") filtered.forEach(t=>{
     const k=groupBy==="week"?t._weekKey:t._monthKey;
@@ -2856,7 +3057,9 @@ function DaysView({data,conflictIds}){
             {Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([gk,gTasks])=>{
               const sample=gTasks[0];
               const title=groupBy==="week"?`Неделя ${weekLabel(sample.day)}`:`${MONTHS[parseInt(gk.split("-")[1])-1]} ${gk.split("-")[0]}`;
-              const dks=[...new Set(gTasks.map(t=>t._dayKey))].sort((a,b)=>daySort(a).localeCompare(daySort(b)));
+              const dks=[...new Set(gTasks.map(t=>t._dayKey))]
+                .filter(dk=>gTasks.some(t=>t._dayKey===dk&&peopleCols.includes(t.person)))
+                .sort((a,b)=>daySort(a).localeCompare(daySort(b)));
               return (
                 <div key={gk}>
                   <div style={{fontSize:13,fontWeight:700,color:"#93c5fd",marginBottom:8,
@@ -2885,7 +3088,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
   const [groupBy,setGroupBy]=useState("day");
   const [hovTask,setHovTask]=useState(null);
   const tasks=useMemo(()=>enrichTasks(data.tasks),[data.tasks]);
-  const people=useMemo(()=>[...new Set(tasks.map(t=>t.person))].sort(),[tasks]);
+  const people=useMemo(()=>[...new Set(tasks.map(t=>t.person).filter(Boolean))].filter(p=>data.people.some(dp=>dp.name===p)).sort(),[tasks,data.people]);
   const containerRef=useRef(null);
 
   useEffect(()=>{
@@ -2893,6 +3096,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
     document.addEventListener("keydown",h);
     return ()=>document.removeEventListener("keydown",h);
   },[]);
+  useEffect(()=>{const t=setTimeout(scrollToToday,150);return()=>clearTimeout(t);},[]);
 
   function togglePerson(name){
     setSelPeople(prev=>prev.includes(name)?prev.filter(p=>p!==name):[...prev,name]);
@@ -2992,7 +3196,7 @@ function PeopleView({data,conflictIds,onPersonSelect}){
                       <div style={{fontSize:9,color:hasC?"#f87171":"#475569",marginBottom:5,letterSpacing:0.5}}>
                         {label}{hasC&&" ⚡"}
                       </div>
-                      {gtasks.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
+                      {gtasks.map(t=><TaskCard key={t.id} task={t} projects={data.projects} isConflict={conflictIds.has(t.id)} large onHover={(t,r)=>setHovTask(t?{task:t,rect:r}:null)}/>)}
                     </div>
                   );
                 })}
@@ -3066,7 +3270,7 @@ function ConflictsView({details,data}){
                     {proj?.name||t.project} · {t.series}
                   </div>
                   <StatusBadge s={t.status} small/>
-                  <div style={{marginLeft:"auto",fontSize:11,color:"#475569"}}>{t.from}:00–{t.to}:00</div>
+                  <div style={{marginLeft:"auto",fontSize:11,color:"#475569"}}>{fmtHour(t.from)}–{fmtHour(t.to)}</div>
                 </div>
               );
             })}
@@ -3223,8 +3427,9 @@ function computeShifts(tasks, people){
   }).sort((a,b)=>a.role.localeCompare(b.role)||a.person.localeCompare(b.person));
 }
 
-function AnalyticsView({data}){
+function AnalyticsView({data,onPersonSelect}){
   const {sorted:stages,stageGroups}=useContext(StagesCtx);
+  const [atab,setAtab]=useState("shifts");
   const [filterProject,setFilterProject]=useState("");
   const [filterSeries,setFilterSeries]=useState("");
   const [filterPerson,setFilterPerson]=useState("");
@@ -3232,14 +3437,15 @@ function AnalyticsView({data}){
   const [dateTo,setDateTo]=useState("");
 
   const filteredTasks=useMemo(()=>{
-    let t=data.tasks;
+    const noImpactIds=new Set(stages.filter(s=>s.noImpact).map(s=>s.id));
+    let t=data.tasks.filter(x=>!x.cancelled&&!noImpactIds.has(x.status));
     if(filterProject) t=t.filter(x=>x.project===filterProject);
     if(filterSeries)  t=t.filter(x=>x.series===filterSeries);
     if(filterPerson)  t=t.filter(x=>x.person===filterPerson);
     if(dateFrom)      t=t.filter(x=>daySort(x.day)>=daySort(dateFrom));
     if(dateTo)        t=t.filter(x=>daySort(x.day)<=daySort(dateTo));
     return t;
-  },[data.tasks,filterProject,filterSeries,filterPerson,dateFrom,dateTo]);
+  },[data.tasks,filterProject,filterSeries,filterPerson,dateFrom,dateTo,stages]);
 
   const seriesOptions=useMemo(()=>{
     const base=(data.series||[]);
@@ -3282,8 +3488,79 @@ function AnalyticsView({data}){
     letterSpacing:1,borderBottom:"1px solid #334155",fontWeight:600,textTransform:"uppercase"};
   const TD={padding:"8px 12px",fontSize:13,borderBottom:"1px solid #1e293b"};
 
+  const activePeople=useMemo(()=>{
+    const noImpactIds=new Set(stages.filter(s=>s.noImpact).map(s=>s.id));
+    return (data.people||[]).filter(p=>p.active!==false)
+      .map(p=>{
+        const pTasks=data.tasks.filter(t=>t.person===p.name&&!t.cancelled&&!noImpactIds.has(t.status));
+        const hours=pTasks.reduce((s,t)=>(Number(t.to)||0)-(Number(t.from)||0)+s,0);
+        const lastTask=pTasks.length?pTasks.reduce((a,b)=>daySort(a.day)>daySort(b.day)?a:b):null;
+        return {...p,taskCount:pTasks.length,hours,lastDay:lastTask?.day||""};
+      })
+      .sort((a,b)=>a.name.localeCompare(b.name));
+  },[data.people,data.tasks,stages]);
+
   return (
     <div>
+      {/* Sub-tab bar */}
+      <div style={{display:"flex",gap:2,marginBottom:20,background:"#0f172a",borderRadius:8,
+        border:"1px solid #334155",overflow:"hidden",width:"fit-content"}}>
+        {[{id:"shifts",label:"Аналитика смен"},{id:"people",label:`Люди (${activePeople.length})`}].map(t=>(
+          <button key={t.id} onClick={()=>setAtab(t.id)}
+            style={{padding:"6px 16px",border:"none",cursor:"pointer",fontSize:12,fontFamily:"inherit",
+              background:atab===t.id?"#3b82f6":"transparent",
+              color:atab===t.id?"#fff":"#64748b",fontWeight:atab===t.id?700:400}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {atab==="people"&&(
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            {activePeople.map(p=>{
+              const roleObjs=(p.roles||[]).map(rid=>(data.roles||[]).find(r=>r.id===rid)).filter(Boolean);
+              const mainRole=roleObjs[0];
+              return (
+                <button key={p.id} onClick={()=>onPersonSelect&&onPersonSelect(p.id)}
+                  style={{background:"#1e293b",border:`1px solid ${mainRole?.color||"#334155"}44`,
+                    borderRadius:10,padding:"14px 16px",cursor:"pointer",textAlign:"left",
+                    fontFamily:"inherit",display:"flex",flexDirection:"column",gap:6,
+                    transition:"border-color 0.15s"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:36,height:36,borderRadius:"50%",flexShrink:0,
+                      background:`${mainRole?.color||"#3b82f6"}22`,
+                      border:`2px solid ${mainRole?.color||"#3b82f6"}`,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:15,fontWeight:800,color:mainRole?.color||"#3b82f6"}}>
+                      {p.name[0]}
+                    </div>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:13,color:"#e2e8f0"}}>{p.name}</div>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
+                        {roleObjs.map(r=>(
+                          <span key={r.id} style={{fontSize:10,color:r.color,
+                            border:`1px solid ${r.color}55`,borderRadius:3,padding:"0px 5px"}}>
+                            {r.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:12,fontSize:11,color:"#475569",paddingTop:4,
+                    borderTop:"1px solid #1e293b"}}>
+                    <span>{p.taskCount} задач</span>
+                    <span>{p.hours} ч</span>
+                    {p.lastDay&&<span style={{marginLeft:"auto",color:"#334155"}}>{p.lastDay}</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {atab==="shifts"&&<div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
         <span style={{fontSize:16,fontWeight:700}}>Аналитика смен</span>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -3452,6 +3729,7 @@ function AnalyticsView({data}){
           </div>
         </div>
       )}
+      </div>}
     </div>
   );
 }
@@ -3487,7 +3765,7 @@ function DayShiftsModal({data,onClose}){
       tasks.forEach(t=>{
         const proj=data.projects.find(p=>p.id===t.project);
         const st=stageMap[t.status];
-        s+=`   • ${proj?.name||t.project}  ${t.series}  ·  ${st?.label||t.status}  ·  ${t.from}:00–${t.to}:00`;
+        s+=`   • ${proj?.name||t.project}  ${t.series}  ·  ${st?.label||t.status}  ·  ${fmtHour(t.from)}–${fmtHour(t.to)}`;
         if(t.note) s+=`  — ${t.note}`;
         s+="\n";
       });
@@ -3560,9 +3838,9 @@ function DayShiftsModal({data,onClose}){
                         {t.note&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>{t.note}</div>}
                       </div>
                       <div style={{fontSize:13,fontWeight:700,color:"#94a3b8",flexShrink:0}}>
-                        {t.from}:00–{t.to}:00
+                        {fmtHour(t.from)}–{fmtHour(t.to)}
                         <span style={{fontSize:10,color:"#475569",marginLeft:4}}>
-                          ({(Number(t.to)||0)-(Number(t.from)||0)}ч)
+                          ({fmtDur(t.from,t.to)})
                         </span>
                       </div>
                     </div>
@@ -3590,12 +3868,13 @@ function PersonCard({personId,data,onBack}){
   ,[data.tasks,personName]);
   const futureTasks=useMemo(()=>tasks.filter(t=>daySort(t.day)>=daySort(todayStr)),[tasks,todayStr]);
   const pastTasks=useMemo(()=>[...tasks.filter(t=>daySort(t.day)<daySort(todayStr))].reverse().slice(0,50),[tasks,todayStr]);
+  const doneAndTodayTasks=useMemo(()=>tasks.filter(t=>daySort(t.day)<=daySort(todayStr)),[tasks,todayStr]);
   const roleColor=person?.roles?.[0]?roleMap[person.roles[0]]?.color||"#3b82f6":"#3b82f6";
-  const totalHrs=tasks.reduce((s,t)=>s+(Number(t.to)-Number(t.from)),0);
+  const totalHrs=doneAndTodayTasks.reduce((s,t)=>s+(Number(t.to)-Number(t.from)),0);
   const avgHrsW=totalHrs/12;
   const activeProjs=new Set(futureTasks.map(t=>t.project)).size;
   const stageCounts={};
-  tasks.forEach(t=>{stageCounts[t.status]=(stageCounts[t.status]||0)+1;});
+  doneAndTodayTasks.forEach(t=>{stageCounts[t.status]=(stageCounts[t.status]||0)+1;});
   const topSt=Object.entries(stageCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
 
   const heatmap=useMemo(()=>{
@@ -3683,10 +3962,22 @@ function PersonCard({personId,data,onBack}){
       )}
 
       {tab==="current"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
           {futureTasks.length===0?(
             <div style={{color:"#475569",padding:"40px 0",textAlign:"center",fontSize:13}}>Нет предстоящих задач</div>
-          ):futureTasks.map(t=><TaskCard key={t.id} task={t} projects={data.projects}/>)}
+          ):(()=>{
+            const byDay={};
+            futureTasks.forEach(t=>{if(!byDay[t.day])byDay[t.day]=[];byDay[t.day].push(t);});
+            return Object.entries(byDay).sort(([a],[b])=>daySort(a).localeCompare(daySort(b))).map(([day,dt])=>(
+              <div key={day} style={{marginBottom:10}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#64748b",padding:"6px 0 4px",
+                  borderBottom:"1px solid #1e293b",marginBottom:4,letterSpacing:0.5}}>
+                  {dayLabel(day)}
+                </div>
+                {dt.map(t=><TaskCard key={t.id} task={t} projects={data.projects}/>)}
+              </div>
+            ));
+          })()}
         </div>
       )}
 
@@ -3726,7 +4017,7 @@ function PersonCard({personId,data,onBack}){
 
       {tab==="stats"&&(
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          {[{l:"СМЕН",v:tasks.length},{l:"ЧАСОВ",v:totalHrs},
+          {[{l:"СМЕН",v:doneAndTodayTasks.length},{l:"ЧАСОВ",v:totalHrs},
             {l:"СЕЙЧАС В ПРОЕКТАХ",v:activeProjs||"—"},{l:"ЧАС/НЕДЕЛЮ",v:avgHrsW.toFixed(1)}
           ].map(({l,v})=>(
             <div key={l} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"12px 20px",minWidth:120}}>
@@ -3753,10 +4044,12 @@ function TodayView({data,conflictDetails,onNavigateConflicts}){
   const today=useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d;},[]);
   const todayStr=useMemo(()=>formatDate(today),[today]);
   const tomorrowStr=useMemo(()=>formatDate(new Date(today.getTime()+86400000)),[today]);
+  const datStr=useMemo(()=>formatDate(new Date(today.getTime()+2*86400000)),[today]);
   const in7Str=useMemo(()=>formatDate(new Date(today.getTime()+7*86400000)),[today]);
 
   const todayTasks=useMemo(()=>data.tasks.filter(t=>t.day===todayStr),[data.tasks,todayStr]);
   const tmrTasks=useMemo(()=>data.tasks.filter(t=>t.day===tomorrowStr),[data.tasks,tomorrowStr]);
+  const datTasks=useMemo(()=>data.tasks.filter(t=>t.day===datStr),[data.tasks,datStr]);
 
   const deadlines=useMemo(()=>{
     const items=[];
@@ -3810,7 +4103,7 @@ function TodayView({data,conflictDetails,onNavigateConflicts}){
           {pts.sort((a,b)=>a.from-b.from).map(t=>(
             <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,
               padding:"5px 0 5px 14px",borderBottom:"1px solid #1e293b"}}>
-              <span style={{fontSize:12,color:"#64748b",minWidth:80}}>{t.from}:00–{t.to}:00</span>
+              <span style={{fontSize:12,color:"#64748b",minWidth:80}}>{fmtHour(t.from)}–{fmtHour(t.to)}</span>
               <span style={{fontSize:14,color:"#e2e8f0",flex:1,fontWeight:500}}>{t.person||<span style={{color:"#475569"}}>—</span>}</span>
               <span style={{fontSize:11,color:"#64748b"}}>{t.series}</span>
               <StatusBadge s={t.status} small/>
@@ -3866,21 +4159,8 @@ function TodayView({data,conflictDetails,onNavigateConflicts}){
               </div>
             )}
           </Block>
-          <Block title="Свободны сегодня" count={freePeople.length} color="#64748b">
-            {freePeople.length===0?(
-              <div style={{color:"#475569",fontSize:14}}>Все заняты</div>
-            ):(
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {freePeople.map(p=>{
-                  const rl=p.roles?.[0]?data.roles.find(r=>r.id===p.roles[0]):null;
-                  return (
-                    <span key={p.id} style={{fontSize:13,background:"transparent",
-                      color:rl?.color||"#64748b",border:`1.5px solid ${rl?.color||"#64748b"}`,
-                      borderRadius:16,padding:"3px 12px"}}>{p.name}</span>
-                  );
-                })}
-              </div>
-            )}
+          <Block title="Послезавтра" count={datTasks.length} color="#64748b">
+            <TasksBlock tasks={datTasks}/>
           </Block>
         </div>
       </div>
@@ -4012,11 +4292,18 @@ function SeriesCard({seriesId,data,onBatchUpdate}){
                 <div><label style={{...lSt,color:"#f59e0b"}}>ЭФ ЭФИР</label>
                   <InpDate value={ser.airDate||""} onChange={v=>upSer({airDate:v})}/></div>
               </div>
-              <div style={{fontSize:10,color:"#475569",letterSpacing:1}}>——— ТРАНЗИТНЫЙ КОД ———</div>
-              <div>
-                <label style={lSt}>ТРАНЗИТНЫЙ КОД</label>
-                <input defaultValue={ser.transitCode||""} style={iSt}
-                  onBlur={e=>{if(e.target.value!==(ser.transitCode||""))upSer({transitCode:e.target.value});}}/>
+              <div style={{fontSize:10,color:"#475569",letterSpacing:1}}>——— ТРАНЗИТНЫЕ КОДЫ ———</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <label style={lSt}>РЕКЛАМНЫЙ</label>
+                  <input defaultValue={ser.transitCodeAd||""} style={iSt}
+                    onBlur={e=>{if(e.target.value!==(ser.transitCodeAd||""))upSer({transitCodeAd:e.target.value});}}/>
+                </div>
+                <div>
+                  <label style={lSt}>БЕЗРЕКЛАМНЫЙ</label>
+                  <input defaultValue={ser.transitCodeNoAd||""} style={iSt}
+                    onBlur={e=>{if(e.target.value!==(ser.transitCodeNoAd||""))upSer({transitCodeNoAd:e.target.value});}}/>
+                </div>
               </div>
             </div>
           </div>
@@ -4234,11 +4521,12 @@ function SeriesCard({seriesId,data,onBatchUpdate}){
 }
 
 // ── КАРТОЧКА ПРОЕКТА ─────────────────────────────────────────────────
-function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelect}){
+function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelect,onDelete}){
   const {sorted:stages,stageGroups,groupMap}=useContext(StagesCtx);
   const [tab,setTab]=useState("general");
   const [editSeries,setEditSeries]=useState(null);
   const [showPwd,setShowPwd]=useState({});
+  const kppDragRef=useRef(null);
 
   const proj=data.projects.find(p=>p.id===projectId);
   if(!proj) return <div style={{padding:24,color:"#475569"}}>Проект не найден.</div>;
@@ -4284,7 +4572,7 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
         order:allS.filter(s=>s.projectId===projectId).length,
         syncStart:serData.syncStart||"",
         transitCode:"",transitVariants:["","",""],
-        checklists:[],notes:"",delivered:false,deliveredAt:"",
+        checklists:[],notes:"",delivered:false,deliveredAt:"",assets:[],
         stageRanges:{...sr}};
       allS.push(final);
     }
@@ -4317,18 +4605,21 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
 
   return (
     <div style={{maxWidth:960,margin:"0 auto"}}>
-      <div style={{display:"flex",gap:1,background:"#0f172a",borderRadius:8,
-        border:"1px solid #334155",overflow:"hidden",width:"fit-content",marginBottom:20}}>
-        {TABS.map(({id,label})=>(
-          <button key={id} onClick={()=>setTab(id)} style={{
-            padding:"6px 16px",border:"none",borderRight:"1px solid #334155",cursor:"pointer",
-            fontSize:12,fontFamily:"inherit",
-            background:tab===id?"#3b82f6":"transparent",
-            color:tab===id?"#fff":"#64748b",
-            fontWeight:tab===id?700:400}}>
-            {label}
-          </button>
-        ))}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{display:"flex",gap:1,background:"#0f172a",borderRadius:8,
+          border:"1px solid #334155",overflow:"hidden",width:"fit-content"}}>
+          {TABS.map(({id,label})=>(
+            <button key={id} onClick={()=>setTab(id)} style={{
+              padding:"6px 16px",border:"none",borderRight:"1px solid #334155",cursor:"pointer",
+              fontSize:12,fontFamily:"inherit",
+              background:tab===id?"#3b82f6":"transparent",
+              color:tab===id?"#fff":"#64748b",
+              fontWeight:tab===id?700:400}}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {onDelete&&<Btn variant="danger" small onClick={()=>onDelete(projectId)}>🗑 Удалить проект</Btn>}
       </div>
 
       {tab==="general"&&(
@@ -4381,7 +4672,8 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
             <div style={{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:10,letterSpacing:1}}>СЕРИИ</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {projSeries.map(ser=>{
-                const sTasks=pTasks.filter(t=>t.seriesId===ser.id||t.series===ser.name);
+                const todayStr=formatDate(new Date());
+                const sTasks=pTasks.filter(t=>(t.seriesId===ser.id||t.series===ser.name)&&daySort(t.day)<=daySort(todayStr));
                 const maxIdx=Math.max(...sTasks.map(t=>stages.findIndex(s=>s.id===t.status)).filter(x=>x>=0),-1);
                 const autoStage=maxIdx>=0?stages[maxIdx]:null;
                 const autoGroupId=autoStage?.groupId||"";
@@ -4442,14 +4734,34 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
                       ЭТАП
                     </th>
                     {projSeries.map(ser=>(
-                      <th key={ser.id} style={{padding:"6px 10px",fontSize:12,fontWeight:700,
-                        textAlign:"center",borderBottom:"2px solid #334155",
-                        borderLeft:"1px solid #334155",minWidth:130,whiteSpace:"nowrap"}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                      <th key={ser.id}
+                        draggable
+                        onDragStart={e=>{kppDragRef.current=ser.id;e.dataTransfer.effectAllowed="move";}}
+                        onDragOver={e=>e.preventDefault()}
+                        onDrop={e=>{
+                          e.preventDefault();
+                          const srcId=kppDragRef.current;
+                          if(!srcId||srcId===ser.id) return;
+                          const arr=[...projSeries];
+                          const si=arr.findIndex(s=>s.id===srcId),ti=arr.findIndex(s=>s.id===ser.id);
+                          if(si===-1||ti===-1) return;
+                          const [item]=arr.splice(si,1);arr.splice(ti,0,item);
+                          const others=(data.series||[]).filter(s=>s.projectId!==projectId);
+                          onBatchUpdate({series:[...others,...arr.map((s,i)=>({...s,order:i}))],tasks:data.tasks});
+                          kppDragRef.current=null;
+                        }}
+                        onDragEnd={()=>{kppDragRef.current=null;}}
+                        style={{padding:"6px 10px",fontSize:12,fontWeight:700,
+                          textAlign:"center",borderBottom:"2px solid #334155",
+                          borderLeft:"1px solid #334155",width:130,maxWidth:130,overflow:"hidden",
+                          cursor:"grab"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,minWidth:0}}>
+                          <span style={{fontSize:9,color:"#334155",flexShrink:0}}>⠿</span>
                           <span
-                            title="Двойной клик — открыть карточку серии"
+                            title={ser.name}
                             onDoubleClick={()=>onSeriesSelect&&onSeriesSelect(ser.id)}
-                            style={{cursor:"pointer",
+                            style={{cursor:"pointer",flex:"1 1 0",minWidth:0,
+                              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
                               color:ser.delivered?"#22c55e":"#e2e8f0",
                               borderBottom:"1px dashed #334155"}}>
                             {ser.name}{ser.delivered?" ✓":""}
@@ -4528,6 +4840,7 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
         </div>
       )}
 
+
       {tab==="info"&&(
         <div style={{background:"#1e293b",borderRadius:10,padding:20,border:"1px solid #334155"}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -4567,7 +4880,7 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:320}}>
               <thead>
                 <tr>
-                  {["Серия","Транзитный код"].map((h,i)=>(
+                  {["Серия","Рекламный","Безрекламный"].map((h,i)=>(
                     <th key={i} style={{textAlign:"left",padding:"6px 10px",fontSize:11,
                       color:"#64748b",letterSpacing:1,borderBottom:"1px solid #334155",whiteSpace:"nowrap"}}>{h}</th>
                   ))}
@@ -4578,8 +4891,12 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
                   <tr key={ser.id} style={{borderBottom:"1px solid #1e293b"}}>
                     <td style={{padding:"6px 10px",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>{ser.name}</td>
                     <td style={{padding:"4px 6px",minWidth:200}}>
-                      <input defaultValue={ser.transitCode||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
-                        onBlur={e=>{if(e.target.value!==(ser.transitCode||""))upSer(ser.id,{transitCode:e.target.value});}}/>
+                      <input defaultValue={ser.transitCodeAd||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
+                        onBlur={e=>{if(e.target.value!==(ser.transitCodeAd||""))upSer(ser.id,{transitCodeAd:e.target.value});}}/>
+                    </td>
+                    <td style={{padding:"4px 6px",minWidth:200}}>
+                      <input defaultValue={ser.transitCodeNoAd||""} style={{...iSt,fontSize:12,padding:"4px 8px"}}
+                        onBlur={e=>{if(e.target.value!==(ser.transitCodeNoAd||""))upSer(ser.id,{transitCodeNoAd:e.target.value});}}/>
                     </td>
                   </tr>
                 ))}
@@ -4664,6 +4981,267 @@ function ProjectCard({projectId,data,onUpdate,onBatchUpdate,onBack,onSeriesSelec
 }
 
 // ── APP ──────────────────────────────────────────────────────────────
+// ── COMMAND PALETTE ──────────────────────────────────────────────────
+function CommandPalette({data,onClose,onNavigate,onSetView,onSetGanttDay}){
+  const [query,setQuery]=useState("");
+  const [selIdx,setSelIdx]=useState(0);
+  const inputRef=useRef(null);
+  const listRef=useRef(null);
+
+  useEffect(()=>{inputRef.current?.focus();},[]);
+  useEffect(()=>{setSelIdx(0);},[query]);
+
+  const NAV_CMDS=[
+    {id:"today",    label:"Сегодня",   sub:"расписание на сегодня",   icon:"📅"},
+    {id:"gantt",    label:"Гант",      sub:"диаграмма Ганта",         icon:"📊"},
+    {id:"calendar", label:"Календарь", sub:"календарный вид",         icon:"🗓"},
+    {id:"projects", label:"Проекты",   sub:"список проектов",         icon:"📁"},
+    {id:"people",   label:"По людям",  sub:"нагрузка людей",          icon:"👥"},
+    {id:"days",     label:"По дням",   sub:"посменный вид",           icon:"📆"},
+    {id:"analytics",label:"Аналитика", sub:"статистика и отчёты",     icon:"📈"},
+    {id:"directory",label:"Настройки", sub:"этапы, роли, праздники",  icon:"⚙"},
+  ];
+
+  const results=useMemo(()=>{
+    const q=query.trim().toLowerCase();
+    if(!q) return [];
+    const words=q.split(/\s+/);
+    const score=(text)=>{
+      const t=(text||"").toLowerCase();
+      if(!words.every(w=>t.includes(w))) return 0;
+      if(t.startsWith(q)) return 3;
+      if(t.includes(q)) return 2;
+      return 1;
+    };
+
+    // Detect "create" intent
+    const CREATE_TRIGGERS=["создать","создат","добавить","новый","новая","новое","новую"];
+    const isCreate=words.some(w=>CREATE_TRIGGERS.some(ct=>ct.startsWith(w)||w===ct));
+
+    const items=[];
+
+    if(isCreate){
+      // Parse target entity
+      const isSmen=words.some(w=>["смену","смены","смен","задачу","задач","задачи","шифт"].includes(w));
+      const isProj=words.some(w=>["проект","проекта","проекты"].includes(w));
+      const isSer=words.some(w=>["серию","серии","серий","серия"].includes(w));
+
+      // Parse task prefill: stage, project, date
+      const parsePrefill=()=>{
+        const today=new Date();
+        const dateMap={"сегодня":0,"завтра":1,"послезавтра":2};
+        let day=null,stageId=null,projectId=null;
+        const STAGES=data.stages||DEFAULT_STAGES;
+        words.forEach(w=>{
+          if(dateMap[w]!==undefined){
+            const d=new Date(today);d.setDate(d.getDate()+dateMap[w]);
+            day=`${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+          }
+          const dm=w.match(/^(\d{1,2})\.(\d{2})$/);
+          if(dm) day=`${dm[1].padStart(2,"0")}.${dm[2]}.${today.getFullYear()}`;
+          STAGES.forEach(s=>{
+            const sl=s.label.toLowerCase();
+            if(sl.includes(w)||w.includes(sl.slice(0,4))||s.id.includes(w)) stageId=s.id;
+          });
+          (data.projects||[]).forEach(p=>{
+            const pl=p.name.toLowerCase(),al=(p.abbr||"").toLowerCase();
+            if(pl.includes(w)||al===w||w.includes(al)) projectId=p.id;
+          });
+        });
+        return {day,stageId,projectId};
+      };
+
+      if(isSmen||(!isProj&&!isSer&&words.length>1)){
+        const pf=parsePrefill();
+        const proj=pf.projectId?(data.projects||[]).find(p=>p.id===pf.projectId):null;
+        const stg=(data.stages||DEFAULT_STAGES).find(s=>s.id===pf.stageId);
+        const hints=[stg?.label,proj?.name,pf.day].filter(Boolean);
+        items.push({type:"create",createType:"task",score:20,icon:"📋",
+          label:"Создать смену"+(hints.length?` — ${hints.join(", ")}`:""),
+          sub:"Открыть Гант с заполненной формой",
+          prefill:{status:pf.stageId||"",project:pf.projectId||"",day:pf.day||""},
+        });
+      }
+      if(isProj||!isSmen){
+        items.push({type:"create",createType:"project",score:18,icon:"📁",
+          label:"Создать проект",sub:"Перейти в раздел Проекты → +",
+        });
+      }
+      if(isSer||!isSmen){
+        items.push({type:"create",createType:"series",score:17,icon:"🎬",
+          label:"Создать серию",sub:"Перейти в Проекты и добавить серию",
+        });
+      }
+    }
+
+    NAV_CMDS.forEach(cmd=>{
+      const s=score(`${cmd.label} ${cmd.sub} ${cmd.id}`);
+      if(s>0) items.push({type:"nav",id:cmd.id,label:cmd.label,sub:cmd.sub,icon:cmd.icon,score:s+10});
+    });
+    (data.projects||[]).forEach(p=>{
+      const s=score(`${p.name} ${p.abbr||""} ${p.description||""}`);
+      if(s>0) items.push({type:"project",id:p.id,label:p.name,
+        sub:[p.abbr,p.description].filter(Boolean).join(" · "),color:p.color,score:s});
+    });
+    (data.series||[]).forEach(ser=>{
+      const proj=(data.projects||[]).find(p=>p.id===ser.projectId);
+      const s=score(`${ser.name} ${proj?.name||""} ${proj?.abbr||""}`);
+      if(s>0) items.push({type:"series",id:ser.id,
+        label:`${proj?.abbr||proj?.name||""} · ${ser.name}`,
+        sub:proj?.name||"",color:proj?.color,score:s});
+    });
+    (data.people||[]).filter(p=>p.active!==false).forEach(p=>{
+      const s=score(p.name);
+      if(s>0) items.push({type:"person",id:p.id,label:p.name,
+        sub:(p.roles||[]).join(", "),score:s});
+    });
+    // Tasks + notes search
+    const STAGES=data.stages||DEFAULT_STAGES;
+    (data.tasks||[]).filter(t=>!t.cancelled).forEach(t=>{
+      const proj=(data.projects||[]).find(p=>p.id===t.project);
+      const stg=STAGES.find(s=>s.id===t.status);
+      const searchText=[t.series,t.person,proj?.name,proj?.abbr,stg?.label,t.note,t.day].filter(Boolean).join(" ");
+      const s=score(searchText);
+      if(s>0) items.push({type:"task",id:t.id,task:t,
+        label:`${t.series}${t.person?" · "+t.person:""}`,
+        sub:[t.day,stg?.label,t.note].filter(Boolean).join(" · "),
+        color:proj?.color,score:s});
+    });
+    const ORDER={create:-1,nav:0,project:1,series:2,person:3,task:4};
+    return items.sort((a,b)=>b.score-a.score||(ORDER[a.type]||9)-(ORDER[b.type]||9)).slice(0,30);
+  },[query,data]);
+
+  useEffect(()=>{
+    if(!listRef.current) return;
+    const el=listRef.current.querySelector("[data-sel=true]");
+    el?.scrollIntoView({block:"nearest"});
+  },[selIdx]);
+
+  function handleKey(e){
+    if(e.key==="Escape"){e.stopPropagation();onClose();return;}
+    if(e.key==="ArrowDown"){e.preventDefault();setSelIdx(i=>Math.min(i+1,results.length-1));}
+    if(e.key==="ArrowUp"){e.preventDefault();setSelIdx(i=>Math.max(i-1,0));}
+    if(e.key==="Enter"){e.preventDefault();if(results[selIdx]) pick(results[selIdx]);}
+  }
+  function pick(item){
+    if(item.type==="nav"){onSetView(item.id);onNavigate(null);}
+    else if(item.type==="project") onNavigate({type:"project",id:item.id});
+    else if(item.type==="series")  onNavigate({type:"series", id:item.id});
+    else if(item.type==="person")  onNavigate({type:"person", id:item.id});
+    else if(item.type==="task"){
+      onSetGanttDay?.(item.task.day);
+      onSetView("gantt");onNavigate(null);
+      setTimeout(()=>window.dispatchEvent(new CustomEvent("gantt-new-task",{detail:item.task})),80);
+    }
+    else if(item.type==="create"){
+      if(item.createType==="task"){
+        onSetView("gantt");onNavigate(null);
+        setTimeout(()=>window.dispatchEvent(new CustomEvent("gantt-new-task",{detail:item.prefill||{}})),80);
+      } else if(item.createType==="project"||item.createType==="series"){
+        onSetView("projects");onNavigate(null);
+      }
+    }
+    onClose();
+  }
+
+  const TYPE_LABELS={create:"СОЗДАТЬ",nav:"НАВИГАЦИЯ",project:"ПРОЕКТЫ",series:"СЕРИИ",person:"ЛЮДИ",task:"ЗАДАЧИ"};
+  const displayList=useMemo(()=>{
+    const out=[];let lastType=null;
+    results.forEach((r,idx)=>{
+      if(r.type!==lastType){out.push({isHeader:true,label:TYPE_LABELS[r.type]||r.type,key:"h-"+r.type});lastType=r.type;}
+      out.push({...r,flatIdx:idx});
+    });
+    return out;
+  },[results]);
+
+  const kbd={fontSize:10,color:"#475569",background:"#0f172a",border:"1px solid #334155",
+    borderRadius:4,padding:"1px 5px",fontFamily:"inherit",display:"inline-block"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",zIndex:9999,
+      display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:"8vh"}}
+      onClick={e=>{if(e.target===e.currentTarget) onClose();}}>
+      <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:12,
+        width:"min(640px,92vw)",maxHeight:"70vh",display:"flex",flexDirection:"column",
+        boxShadow:"0 25px 60px rgba(0,0,0,0.65)",overflow:"hidden"}}>
+
+        <div style={{display:"flex",alignItems:"center",padding:"12px 16px",
+          borderBottom:"1px solid #334155",gap:10}}>
+          <span style={{fontSize:14,color:"#475569",flexShrink:0}}>🔍</span>
+          <input ref={inputRef} value={query}
+            onChange={e=>setQuery(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Поиск или «создать смену монтажа СВ завтра»..."
+            style={{flex:1,background:"none",border:"none",outline:"none",
+              fontSize:15,color:"#e2e8f0",fontFamily:"inherit"}}/>
+          {query&&<button onClick={()=>setQuery("")}
+            style={{background:"none",border:"none",color:"#475569",cursor:"pointer",
+              fontSize:13,padding:"2px 4px",lineHeight:1}}>✕</button>}
+          <span style={kbd}>ESC</span>
+        </div>
+
+        <div ref={listRef} style={{overflowY:"auto",flex:1}}>
+          {!query.trim()&&(
+            <div style={{padding:"18px 16px"}}>
+              <div style={{fontSize:12,color:"#475569",marginBottom:10}}>
+                Поиск по проектам, сериям и людям. Или напишите «создать смену монтажа СВ завтра»
+              </div>
+              <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:11,color:"#475569"}}>
+                <span><span style={kbd}>↑</span> <span style={kbd}>↓</span> навигация</span>
+                <span><span style={kbd}>Enter</span> открыть</span>
+                <span><span style={kbd}>Esc</span> закрыть</span>
+                <span><span style={kbd}>Ctrl+K</span> открыть</span>
+              </div>
+            </div>
+          )}
+          {query.trim()&&results.length===0&&(
+            <div style={{padding:"28px 16px",textAlign:"center",color:"#475569",fontSize:13}}>
+              Ничего не найдено по запросу «{query}»
+            </div>
+          )}
+          {displayList.map((item,i)=>{
+            if(item.isHeader) return (
+              <div key={item.key} style={{padding:"8px 16px 3px",fontSize:10,
+                color:"#334155",letterSpacing:2,fontWeight:700}}>{item.label}</div>
+            );
+            const sel=item.flatIdx===selIdx;
+            return (
+              <div key={item.type+(item.id||item.createType||i)} data-sel={sel}
+                onMouseEnter={()=>setSelIdx(item.flatIdx)}
+                onClick={()=>pick(item)}
+                style={{padding:"7px 16px",cursor:"pointer",display:"flex",
+                  alignItems:"center",gap:10,background:sel?"#334155":"transparent"}}>
+                {item.icon?(
+                  <span style={{fontSize:13,width:18,textAlign:"center",flexShrink:0}}>{item.icon}</span>
+                ):item.color?(
+                  <span style={{width:8,height:8,borderRadius:"50%",background:item.color,
+                    flexShrink:0,display:"inline-block"}}/>
+                ):(
+                  <span style={{width:18,fontSize:11,color:"#475569",flexShrink:0,textAlign:"center"}}>·</span>
+                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#e2e8f0",
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item.label}</div>
+                  {item.sub&&<div style={{fontSize:11,color:"#64748b",
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item.sub}</div>}
+                </div>
+                {sel&&<span style={{fontSize:11,color:"#475569",flexShrink:0}}>↵</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {results.length>0&&(
+          <div style={{padding:"5px 16px",borderTop:"1px solid #1e293b",
+            fontSize:10,color:"#334155"}}>
+            Найдено: {results.length}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const [data,setData]=useState(null);
   const [view,setView]=useState("today");
@@ -4671,6 +5249,7 @@ function App(){
   const [syncState,setSyncState]=useState("ok");
   const [dayShiftsModal,setDayShiftsModal]=useState(false);
   const [ganttDay,setGanttDay]=useState(null);
+  const [cmdPaletteOpen,setCmdPaletteOpen]=useState(false);
   const saveTimer=useRef(null);
 
   useEffect(()=>{
@@ -4685,7 +5264,7 @@ function App(){
           return cloudSave(demo);
         }
         let migrated=false;
-        if(!record.roles||!record.roles.length){record.roles=DEMO_ROLES;migrated=true;}
+        if(!record.roles){record.roles=DEMO_ROLES;migrated=true;}
         if(!record.stages||!record.stages.length){record.stages=DEFAULT_STAGES;migrated=true;}
         if(!record.stageGroups||!record.stageGroups.length){record.stageGroups=DEFAULT_STAGE_GROUPS;migrated=true;}
         if(!record.holidays){record.holidays=DEFAULT_HOLIDAYS;migrated=true;}
@@ -4736,11 +5315,31 @@ function App(){
             {...s,syncStart:""});
           migrated=true;
         }
+        if((record.series||[]).some(s=>!s.assets)){
+          record.series=(record.series||[]).map(s=>s.assets?s:{...s,assets:[]});
+          migrated=true;
+        }
+        // Если локальный бэкап новее облака — берём его
+        try{
+          const raw=localStorage.getItem("bbx_local_backup");
+          if(raw){
+            const bk=JSON.parse(raw);
+            if(bk?.ts&&bk.data&&record._savedAt&&bk.ts>record._savedAt){
+              Object.assign(record,bk.data);
+              migrated=true;
+            }
+          }
+        }catch(e){}
         setData(record);
         if(migrated) return cloudSave(record);
       })
       .then(()=>setSyncState("ok"))
       .catch(()=>{
+        // Если облако недоступно — пробуем локальный бэкап
+        try{
+          const raw=localStorage.getItem("bbx_local_backup");
+          if(raw){const bk=JSON.parse(raw);if(bk?.data){setData(bk.data);setSyncState("error");return;}}
+        }catch(e){}
         setData(makeDemoData());
         setSyncState("error");
       });
@@ -4754,10 +5353,12 @@ function App(){
     histRef.current=[...histRef.current.slice(-30),prev];
   }
   function doSave(d){
+    const payload={...d,_savedAt:Date.now()};
     clearTimeout(saveTimer.current);
     setSyncState("saving");
+    try{localStorage.setItem("bbx_local_backup",JSON.stringify({ts:payload._savedAt,data:payload}));}catch(e){}
     saveTimer.current=setTimeout(()=>{
-      cloudSave(d).then(()=>setSyncState("ok")).catch(()=>setSyncState("error"));
+      cloudSave(payload).then(()=>setSyncState("ok")).catch(()=>setSyncState("error"));
     },1000);
   }
   function undo(){
@@ -4783,6 +5384,7 @@ function App(){
     function handle(e){
       const ctrl=e.ctrlKey||e.metaKey;
       if(ctrl&&(e.key==="z"||e.code==="KeyZ")&&!e.shiftKey){e.preventDefault();undo();}
+      if(ctrl&&(e.key==="k"||e.code==="KeyK")){e.preventDefault();setCmdPaletteOpen(o=>!o);}
       if(e.altKey&&(e.code==="KeyN")&&viewRef.current==="gantt"){
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("gantt-new-task"));
@@ -4802,15 +5404,13 @@ function App(){
   }
 
   function deleteProject(projId){
-    if(!window.confirm("Удалить проект? Задачи на сегодня и раньше сохранятся.")) return;
-    const todaySort=daySort(formatDate(new Date()));
+    if(!window.confirm("Удалить проект? Все задачи останутся в базе как история.")) return;
     setData(d=>{
       pushHistory(d);
       const newData={
         ...d,
         projects:d.projects.filter(p=>p.id!==projId),
         series:(d.series||[]).filter(s=>s.projectId!==projId),
-        tasks:d.tasks.filter(t=>t.project!==projId||daySort(t.day)<=todaySort),
       };
       doSave(newData);
       return newData;
@@ -4840,7 +5440,7 @@ function App(){
   const {ids:conflictIds,details:conflictDetails}=useMemo(()=>{
     if(!data) return {ids:new Set(),details:[]};
     const todayStr=daySort(formatDate(new Date()));
-    return getConflicts(data.tasks.filter(t=>daySort(t.day)>=todayStr),data.people,data.stages||DEFAULT_STAGES);
+    return getConflicts(data.tasks.filter(t=>daySort(t.day)>=todayStr&&!t.cancelled),data.people,data.stages||DEFAULT_STAGES);
   },[data?.tasks,data?.people,data?.stages]);
   const conflictCount=conflictDetails.length;
 
@@ -4867,26 +5467,37 @@ function App(){
     <HolidaysCtx.Provider value={holidaysCtxVal}>
     <div style={{background:"#0f172a",minHeight:"100vh",color:"#e2e8f0"}}>
       <div style={{background:"#1e293b",borderBottom:"1px solid #334155",padding:"12px 20px",position:"sticky",top:0,zIndex:50}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div>
+        <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+          <div style={{flexShrink:0}}>
             <div className="bbx-title" style={{fontSize:22,fontWeight:800,letterSpacing:1}}>
               ББХ · Постпродакшн
             </div>
             <div style={{fontSize:12,color:"#475569",marginTop:2}}>Планирование студии</div>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {{ok:    <span style={{fontSize:11,color:"#22c55e"}}>✓ Сохранено</span>,
-              saving:<span style={{fontSize:11,color:"#f59e0b"}}>⟳ Сохранение...</span>,
-              error: <span style={{fontSize:11,color:"#ef4444"}}>⚠ Нет связи</span>,
+          <div style={{flex:1,display:"flex",justifyContent:"center"}}>
+            <button onClick={()=>setCmdPaletteOpen(true)}
+              style={{background:"#0f172a",border:"1px solid #1e3a5f",borderRadius:6,
+                padding:"5px 12px",cursor:"pointer",display:"flex",alignItems:"center",
+                gap:8,fontFamily:"inherit"}}>
+              <span style={{fontSize:13,color:"#334155",lineHeight:1}}>🔍</span>
+              <span style={{fontSize:12,color:"#334155",letterSpacing:1,userSelect:"none"}}>Поиск</span>
+              <span style={{fontSize:9,color:"#1e3a5f",border:"1px solid #1e3a5f",
+                borderRadius:3,padding:"1px 5px",letterSpacing:0,flexShrink:0}}>Ctrl+K</span>
+            </button>
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+            {{ok:    <span style={{fontSize:11,color:"#22c55e"}}>✓</span>,
+              saving:<span style={{fontSize:11,color:"#f59e0b"}}>⟳</span>,
+              error: <span style={{fontSize:11,color:"#ef4444"}}>⚠</span>,
             }[syncState]}
-            <Btn variant="ghost" small onClick={()=>setDayShiftsModal(true)}>📋 Смены на день</Btn>
+            <Btn variant="ghost" small onClick={()=>setDayShiftsModal(true)}>📋 Смены</Btn>
             <Btn variant="ghost" small onClick={()=>importJSON(imported=>{
               if(!window.confirm("Заменить все текущие данные данными из файла?")) return;
               pushHistory(data);
               setData(imported);
               doSave(imported);
-            })}>↑ Импорт</Btn>
-            <Btn variant="ghost" small onClick={()=>data&&exportJSON(data)}>↓ Экспорт</Btn>
+            })}>↑</Btn>
+            <Btn variant="ghost" small onClick={()=>data&&exportJSON(data)}>↓</Btn>
           </div>
         </div>
         {navState?.type==="project"?(
@@ -4945,7 +5556,8 @@ function App(){
           <SeriesCard seriesId={navState.id} data={data} onBatchUpdate={batchUpdate}/>
         ):navState?.type==="project"?(
           <ProjectCard projectId={navState.id} data={data} onUpdate={updateData} onBatchUpdate={batchUpdate}
-            onBack={()=>navigate(null)} onSeriesSelect={id=>navigate({type:"series",id})}/>
+            onBack={()=>navigate(null)} onSeriesSelect={id=>navigate({type:"series",id})}
+            onDelete={id=>{deleteProject(id);navigate(null);}}/>
         ):(
         <>
         {view==="today"    &&<TodayView     data={data} conflictDetails={conflictDetails} onNavigateConflicts={()=>setView("conflicts")}/>}
@@ -4955,7 +5567,7 @@ function App(){
         {view==="days"     &&<DaysView      data={data} conflictIds={conflictIds}/>}
         {view==="people"   &&<PeopleView    data={data} conflictIds={conflictIds} onPersonSelect={id=>navigate({type:"person",id})}/>}
         {view==="conflicts" &&<ConflictsView details={conflictDetails} data={data}/>}
-        {view==="analytics" &&<AnalyticsView data={data}/>}
+        {view==="analytics" &&<AnalyticsView data={data} onPersonSelect={id=>navigate({type:"person",id})}/>}
         {view==="directory" &&<DirectoryView data={data} onUpdate={updateData} onBatchUpdate={batchUpdate}/>}
         </>
         )}
@@ -4980,6 +5592,10 @@ function App(){
       </div>
     </div>
     {dayShiftsModal&&<DayShiftsModal data={data} onClose={()=>setDayShiftsModal(false)}/>}
+    {cmdPaletteOpen&&<CommandPalette data={data} onClose={()=>setCmdPaletteOpen(false)}
+      onNavigate={state=>{navigate(state);}}
+      onSetView={v=>{setView(v);navigate(null);}}
+      onSetGanttDay={setGanttDay}/>}
     </HolidaysCtx.Provider>
     </StagesCtx.Provider>
   );
